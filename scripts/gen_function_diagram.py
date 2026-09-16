@@ -12,27 +12,28 @@ L2_W, L2_H, L2_FONT = 150, 30, 15
 ROOT_W, ROOT_H, ROOT_FONT = 200, 40, 20
 
 C = dict(
-    root="#1F4E79",
-    pat_fill="#DEEBF7", pat_bd="#2E75B6", pat_txt="#1F4E79",
-    adm_fill="#E2EFDA", adm_bd="#538135", adm_txt="#375623",
-    mod_txt="#222222",
-    leaf_pat_fill="#F7FAFD", leaf_pat_bd="#9DC3E6",
-    leaf_adm_fill="#F4FAF1", leaf_adm_bd="#A9D18E",
-    leaf_txt="#333333",
-    conn="#666666",
+    root="#FFFFFF",
+    pat_fill="#FFFFFF", pat_bd="#222222", pat_txt="#111111",
+    adm_fill="#FFFFFF", adm_bd="#222222", adm_txt="#111111",
+    mod_txt="#111111",
+    leaf_pat_fill="#FFFFFF", leaf_pat_bd="#555555",
+    leaf_adm_fill="#FFFFFF", leaf_adm_bd="#555555",
+    leaf_txt="#222222",
+    conn="#444444",
 )
 
 PAT = dict(label="患者端功能模块", fill=C["pat_fill"], bd=C["pat_bd"], txt=C["pat_txt"],
            is_pat=True,
-           mods=[("用户与鉴权", ["注册登录", "个人信息"]),
-                 ("智能导诊对话", ["症状描述输入", "SSE流式回复", "多轮对话追问", "Top3推荐卡片"]),
-                 ("模拟挂号", ["科室列表选择", "挂号成功确认"]),
-                 ("行为埋点", ["推荐结果查看", "模拟挂号选择", "挂号成功确认"])])
+           mods=[("用户管理", ["注册登录", "个人信息"]),
+                 ("智能导诊对话", ["症状描述导入", "SSE流式回复", "多轮对话追问", "智能推荐候选科室"]),
+                 ("挂号", ["科室列表选择", "就诊登记"]),
+                 ("行为埋点", ["推荐结果触达", "就诊意向选择", "就诊结果回填"])])
 ADM = dict(label="管理端功能模块", fill=C["adm_fill"], bd=C["adm_bd"], txt=C["adm_txt"],
            is_pat=False,
            mods=[("知识库管理", ["文档异步入库", "症状科室映射", "版本与变更日志"]),
                  ("反馈审核", ["待审队列", "证据快照还原", "根因归因标注", "审批通过或驳回"]),
                  ("统计看板", ["导诊量统计", "准确率趋势", "错误分布分析", "知识盲区榜"]),
+                 ("用户管理", ["用户封禁与解封", "敏感词库管理"]),
                  ("系统配置", ["LLM配置", "检索参数配置", "聚合阈值配置"])])
 
 
@@ -107,8 +108,8 @@ for side, widths, total in ((PAT, pat_w, PAT_TOTAL), (ADM, adm_w, ADM_TOTAL)):
 # ---------------- 根节点 ----------------
 ROOT_CX = round((sides[0]['c'] + sides[1]['c']) / 2)
 root_y = ROOT_Y
-rect(ROOT_CX - ROOT_W / 2, root_y, ROOT_W, ROOT_H, C["root"], C["root"], rx=4)
-text(ROOT_CX, root_y + 27, "智能导诊系统", ROOT_FONT, "white", bold=True)
+rect(ROOT_CX - ROOT_W / 2, root_y, ROOT_W, ROOT_H, C["root"], "#111111", sw=1.4, rx=4)
+text(ROOT_CX, root_y + 27, "智能导诊系统", ROOT_FONT, "#111111", bold=True)
 
 # 根 → 两端
 line(ROOT_CX, root_y + ROOT_H, ROOT_CX, BUS1_Y)

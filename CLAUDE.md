@@ -24,8 +24,8 @@ frontend/
 ```
 backend/
 ├── common/     # 公共件：统一返回体、异常、工具类、常量；被所有模块依赖，不依赖任何业务模块
-├── auth/       # 链路 D：Security + JWT 签发/校验、登录注册、角色权限
-├── chat/       # 链路 A：问诊对话编排、SSE 四态事件流、会话/消息落库、信息充足性判定与追问
+├── auth/       # 链路 D：Security + JWT 签发/校验、登录注册、角色权限、用户封禁状态校验
+├── chat/       # 链路 A：问诊对话编排、SSE 四态事件流、会话/消息落库、信息充足性判定与追问、敏感词入口前置校验
 ├── rag/        # RAG 检索层：查询改写→召回→重排→Prompt→解析
 ├── llm/        # LLM 适配层：DeepSeek 对话 / 阿里 embedding / 阿里 rerank；唯一外部模型出口
 ├── kb/         # 链路 B：知识库管理、科室/文档/映射维护；唯一写向量库入口
@@ -58,7 +58,9 @@ MySQL、PostgreSQL + pgvector、MinIO、Spring Security + JWT、MyBatis、Redis�
 type：feat / fix / docs / style / refactor / perf / test / chore。
 scope：common / chat / kb / feedback / auth / admin / patient / rag / llm / async / stats。
 
-密钥安全：配置文件（application.yml、.env 等）含密钥/API Key 时，提交前必须提醒用户不要提交；密钥一律走环境变量或本地 profile（已 gitignore）。
+密钥安全：配置文件（application.yml、.env 等）含密钥/API Key 时，提交前必须提醒用户不要提交。
+配置分工：`application.yml` 公共配置（占位符 `${...}`，提交）；`application-local.yml` 私密配置（真实密钥，不提交，已 gitignore）。
+新增密钥流程：cp application.yml application-local.yml → 在 local 填真实值 → 正常启动（active 叠加覆盖）；同时更新 `application-local.yml.example` 模板（占位符，提交）。
 
 ## 5. 功能完成后的校验（提交前逐项过）
 
