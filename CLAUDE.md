@@ -39,8 +39,8 @@ backend/
 
 - 依赖方向：admin → 各业务模块 → rag → llm；所有模块 → common；禁止反向与循环
 - rag 不依赖业务模块，不感知业务状态（会话、用户）
-- chat 不得直连向量库与 LLM，只经 rag → llm
-- kb 是唯一写向量库入口（上传流水线 + 回流同步）
+- chat 不得直连向量库、ES 与 LLM，只经 rag → llm
+- kb 是唯一写向量库与 ES chunk 索引入口（上传流水线 + 回流同步，双写同事务边界）
 - feedback 只读导诊记录、只写映射与知识片段；埋点旁路，不阻塞主流程
 - async 线程池与在线导诊线程隔离，不共用
 - 回流只前向修正，不回改历史导诊记录；写知识库唯一路径是人工 approve
@@ -48,9 +48,9 @@ backend/
 
 ## 3. 中间件（只许用这些，不额外引入）
 
-MySQL、PostgreSQL + pgvector、MinIO、Spring Security + JWT、MyBatis、Redis（存储用户登录 JWT）。
-不引入消息队列、Elasticsearch、注册中心；新依赖先确认现有组件无法等价实现。
-双库分工：MySQL 管事实，pgvector 管语义。
+MySQL、PostgreSQL + pgvector、MinIO、Spring Security + JWT、MyBatis、Redis（存储用户登录 JWT）、Elasticsearch（chunk 全文检索 + 医疗术语聚合）。
+不引入消息队列、注册中心；新依赖先确认现有组件无法等价实现。
+双库分工：MySQL 管事实，pgvector 管语义，ES 管全文检索与术语聚合。
 
 ## 4. Git 提交规范
 
@@ -65,6 +65,7 @@ scope：common / chat / kb / feedback / auth / admin / patient / rag / llm / asy
 ## 5. 功能完成后的校验（提交前逐项过）
 
 - 数据流：entity / mapper / dto / 前端 api / 页面五处同步；检查统计看板、导出、关联页面是否漏改
+- 检索存储双写：chunk 改动必须同步 pgvector 与 ES 两路（索引/删除均同事务边界）
 - 约束：无新中间件；依赖方向未破坏；未绕过 LLM 适配层；埋点未侵入主流程；线程池未混用
 - 验证：后端编译通过；接口真实请求跑通；涉及链路 A/B/C/D 时核对基线文档对齐点
 - 文档：涉及链路对齐点、参数、模块边界的改动，同步更新《总体架构与链路设计.md》
