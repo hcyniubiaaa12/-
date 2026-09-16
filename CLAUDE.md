@@ -1,0 +1,69 @@
+# CLAUDE.md —— 智能导诊系统 全局规范
+
+## 1. 目录层级
+
+### 1.1 前端（单工程，Vite）
+
+```
+frontend/
+├── src/
+│   ├── views/patient/   # 患者端（Vant）：对话、推荐卡片、模拟挂号
+│   ├── views/admin/     # 管理端（Element Plus）：知识库、审核、看板、LLM 配置
+│   ├── api/             # HTTP 统一封装：拦截器带 JWT、401 跳登录
+│   ├── stores/          # Pinia：登录态、会话状态
+│   ├── utils/           # 埋点上报、SSE 客户端
+│   └── router/          # 路由守卫：admin 路由校验 ROLE_ADMIN
+└── vite.config.js       # /api 代理到后端
+```
+
+- 患者端与管理端物理隔离，不互相 import
+- 患者端视觉风格遵循 `.claude/rules/前端设计方案.md`（临床纸感方案 A），管理端遵循同文件「冷靛控制台」章节（方案 B），均已定稿；新页面不得偏离对应方案的色板、字体与部件规范
+
+### 1.2 后端（Maven 多模块）
+
+```
+backend/
+├── common/     # 公共件：统一返回体、异常、工具类、常量；被所有模块依赖，不依赖任何业务模块
+├── auth/       # 链路 D：Security + JWT 签发/校验、登录注册、角色权限
+├── chat/       # 链路 A：问诊对话编排、SSE 四态事件流、会话/消息落库、信息充足性判定与追问
+├── rag/        # RAG 检索层：查询改写→召回→重排→Prompt→解析
+├── llm/        # LLM 适配层：DeepSeek 对话 / 阿里 embedding / 阿里 rerank；唯一外部模型出口
+├── kb/         # 链路 B：知识库管理、科室/文档/映射维护；唯一写向量库入口
+├── async/      # 离线侧：入库流水线线程池 + 任务表编排（解析→切分→向量化→入库）
+├── feedback/   # 链路 C：埋点、比对、聚合、审核回流
+├── stats/      # 统计看板：准确率/分布/盲区
+└── admin/      # 启动器：聚合全部模块、controller 层、application.yml
+```
+
+## 2. 依赖规范（单向，禁止循环）
+
+- 依赖方向：admin → 各业务模块 → rag → llm；所有模块 → common；禁止反向与循环
+- rag 不依赖业务模块，不感知业务状态（会话、用户）
+- chat 不得直连向量库与 LLM，只经 rag → llm
+- kb 是唯一写向量库入口（上传流水线 + 回流同步）
+- feedback 只读导诊记录、只写映射与知识片段；埋点旁路，不阻塞主流程
+- async 线程池与在线导诊线程隔离，不共用
+- 回流只前向修正，不回改历史导诊记录；写知识库唯一路径是人工 approve
+- JWT 登录态存 Redis，登出/过期即时失效；其余业务状态一律落库，不经 Redis
+
+## 3. 中间件（只许用这些，不额外引入）
+
+MySQL、PostgreSQL + pgvector、MinIO、Spring Security + JWT、MyBatis、Redis（存储用户登录 JWT）。
+不引入消息队列、Elasticsearch、注册中心；新依赖先确认现有组件无法等价实现。
+双库分工：MySQL 管事实，pgvector 管语义。
+
+## 4. Git 提交规范
+
+`<type>(<scope>): <subject>`，一次提交一件事。
+type：feat / fix / docs / style / refactor / perf / test / chore。
+scope：common / chat / kb / feedback / auth / admin / patient / rag / llm / async / stats。
+
+密钥安全：配置文件（application.yml、.env 等）含密钥/API Key 时，提交前必须提醒用户不要提交；密钥一律走环境变量或本地 profile（已 gitignore）。
+
+## 5. 功能完成后的校验（提交前逐项过）
+
+- 数据流：entity / mapper / dto / 前端 api / 页面五处同步；检查统计看板、导出、关联页面是否漏改
+- 约束：无新中间件；依赖方向未破坏；未绕过 LLM 适配层；埋点未侵入主流程；线程池未混用
+- 验证：后端编译通过；接口真实请求跑通；涉及链路 A/B/C/D 时核对基线文档对齐点
+- 文档：涉及链路对齐点、参数、模块边界的改动，同步更新《总体架构与链路设计.md》
+- 校验：功能修改后检查 `.claude/rules/` 下全部文档（数据库设计.md、前端设计方案.md）是否过时，CLAUDE.md 本身同样校验；过时即同步更新
