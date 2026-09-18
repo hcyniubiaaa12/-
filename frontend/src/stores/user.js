@@ -8,7 +8,8 @@ export const useUserStore = defineStore('user', () => {
   const nickname = ref(localStorage.getItem('nickname') || '')
 
   const isLogin = computed(() => !!token.value)
-  const isAdmin = computed(() => role.value === 'ADMIN')
+  // role 取枚举编码值（user.role 存英文小写，见《数据库设计.md》§0）
+  const isAdmin = computed(() => role.value === 'admin')
 
   function setLogin(data) {
     token.value = data.token

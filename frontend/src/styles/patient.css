@@ -1,0 +1,374 @@
+/* ============================================================
+   患者端「临床纸感」方案 A —— 令牌与部件
+   见 .claude/rules/前端设计方案.md；参考稿 方案A2-临床纸感增强.html
+   作用域：全部规则挂在 .patient-root 下，与管理端样式互不干扰
+   ============================================================ */
+
+.patient-root {
+  /* 色板（只用这些值） */
+  --paper: #F7F9F8;
+  --card: #FFFFFF;
+  --ink: #1C2B28;
+  --ink-2: #5A6B67;
+  --line: #DDE5E2;
+  --teal: #0E7C66;
+  --teal-deep: #0A5C4C;
+  --moss: #4A7C59;
+  --teal-soft: #CDE3DD;
+  --err: #A94438;
+
+  /* 字体：正文/显示衬线，界面标签无衬线 + 大字距 */
+  --serif: 'Noto Serif SC', 'Songti SC', 'SimSun', serif;
+  --sans: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+
+  min-height: 100vh;
+  background: var(--paper);
+  color: var(--ink);
+  font-family: var(--serif);
+  font-size: 14px;
+  line-height: 1.7;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* 键盘可达：focus-visible 用 teal 2px 描边 */
+.patient-root *:focus-visible {
+  outline: 2px solid var(--teal);
+  outline-offset: 2px;
+}
+
+.p-eyebrow {
+  font-family: var(--sans);
+  font-size: 10.5px;
+  letter-spacing: .22em;
+  color: var(--ink-2);
+  text-transform: uppercase;
+}
+
+/* ---------- 顶栏：病历抬头式 ---------- */
+.p-topbar {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  padding: 14px 16px 12px;
+  background: var(--card);
+  border-bottom: 1px solid var(--ink);
+}
+.p-topbar__title {
+  font-family: var(--serif);
+  font-size: 17px;
+  letter-spacing: .04em;
+}
+.p-topbar__sub {
+  font-family: var(--sans);
+  font-size: 10.5px;
+  letter-spacing: .18em;
+  color: var(--ink-2);
+}
+
+/* ---------- 对话区 ---------- */
+.p-thread {
+  display: flex;
+  flex-direction: column;
+  gap: 18px; /* 会话区垂直节奏 18px */
+  padding: 18px 16px 8px;
+}
+
+/* AI 回复：直排文字无底色 + moss 小标签 */
+.p-ai__tag {
+  font-family: var(--sans);
+  font-size: 10.5px;
+  letter-spacing: .18em;
+  color: var(--moss);
+  margin-bottom: 4px;
+}
+.p-ai__text {
+  font-size: 14.5px;
+  line-height: 1.8;
+  white-space: pre-wrap;
+}
+
+/* 用户消息：实心 teal 气泡（圆角只用于气泡） */
+.p-user {
+  align-self: flex-end;
+  max-width: 82%;
+  background: var(--teal);
+  color: #fff;
+  padding: 9px 13px;
+  border-radius: 14px 14px 3px 14px;
+  font-size: 14.5px;
+  line-height: 1.6;
+}
+
+/* 追问消息：与普通回复同款，不加特殊样式 */
+.p-ask {
+  border-left: 2px solid var(--teal-soft);
+  padding-left: 10px;
+  color: var(--ink);
+}
+
+/* SSE error：line 描边块，说清原因与下一步 */
+.p-error {
+  border: 1px solid var(--line);
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--ink-2);
+}
+.p-error__retry {
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: .1em;
+  color: var(--teal);
+  text-decoration: underline;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 0;
+}
+
+/* ---------- 推荐卡（签名元素 · 单据） ---------- */
+.p-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  padding: 16px; /* 卡片内边距 16px，直角 0 圆角 */
+}
+.p-card__head {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  margin-bottom: 12px;
+}
+.p-card__dept {
+  font-size: 24px; /* 结论科室名 24px */
+  letter-spacing: .03em;
+  line-height: 1.2;
+}
+.p-card__conf {
+  font-family: var(--sans);
+  font-size: 15px;
+  font-weight: 600;
+  color: var(--teal);
+}
+.p-card__conf--low {
+  color: var(--err);
+}
+
+/* 置信度条列表（Top3 横向概率条） */
+.p-bars {
+  margin: 12px 0 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.p-bar {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.p-bar__name {
+  width: 92px; /* 科室名列宽 92px */
+  flex: none;
+  font-size: 12.5px;
+  color: var(--ink-2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.p-bar__track {
+  flex: 1;
+  height: 5px; /* 条高 5px，直角 */
+  background: var(--teal-soft);
+}
+.p-bar__fill {
+  height: 100%;
+  background: var(--teal-soft);
+}
+.p-bar__pct {
+  flex: none;
+  width: 44px;
+  text-align: right;
+  font-family: var(--sans);
+  font-size: 11px;
+  color: var(--ink-2);
+}
+.p-bar--top .p-bar__name {
+  color: var(--ink);
+  font-weight: 600;
+}
+.p-bar--top .p-bar__fill {
+  background: var(--teal);
+}
+.p-bar--top .p-bar__pct {
+  color: var(--teal);
+  font-weight: 600;
+}
+
+.p-card__note {
+  font-size: 13px;
+  line-height: 1.75;
+  color: var(--ink);
+}
+
+/* 脚注区：1px dashed 上边框 + 「判 断 依 据」 */
+.p-card__foot {
+  margin-top: 14px;
+  padding-top: 10px;
+  border-top: 1px dashed var(--line);
+}
+.p-card__foot .p-eyebrow {
+  display: block;
+  margin-bottom: 6px;
+}
+.p-cite {
+  font-size: 12.5px;
+  color: var(--ink-2);
+  line-height: 1.7;
+}
+.p-cite__no {
+  color: var(--teal);
+  font-family: var(--sans);
+  font-size: 11px;
+}
+.p-card__lowhint {
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: var(--err);
+}
+
+/* ---------- 按钮 ---------- */
+.p-btn {
+  display: block;
+  width: 100%;
+  min-height: 44px; /* 触控目标 ≥ 44px */
+  border: 0;
+  border-radius: 0; /* 按钮直角 */
+  background: var(--teal);
+  color: #fff;
+  font-family: var(--sans);
+  font-size: 13px;
+  letter-spacing: .14em;
+  cursor: pointer;
+  transition: background .18s ease;
+}
+.p-btn:hover { background: var(--teal-deep); }
+.p-btn--ghost {
+  background: transparent;
+  color: var(--teal);
+  border: 1px solid var(--line);
+}
+.p-btn--ghost:hover { background: transparent; border-color: var(--teal); }
+
+/* ---------- 步进流程条 ---------- */
+.p-steps {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0;
+  padding: 10px 16px;
+  background: var(--paper);
+  border-top: 1px solid var(--line);
+  font-family: var(--sans);
+  font-size: 11px;
+  letter-spacing: .06em;
+  color: var(--ink-2);
+}
+.p-steps__item { display: inline-flex; align-items: center; gap: 4px; }
+.p-steps__no {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 15px;
+  height: 15px;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  font-size: 9px;
+}
+.p-steps__link { width: 26px; height: 1px; background: var(--line); margin: 0 6px; }
+.p-steps__item--now { color: var(--teal); font-weight: 700; }
+.p-steps__item--now .p-steps__no { border-color: var(--teal); color: var(--teal); }
+.p-steps__item--done { color: var(--teal); }
+.p-steps__item--done .p-steps__no { border-color: var(--teal); background: var(--teal); color: #fff; }
+
+/* ---------- 输入区 ---------- */
+.p-composer {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  padding: 10px 16px 14px;
+  background: var(--card);
+  border-top: 1px solid var(--line);
+}
+.p-composer__input {
+  flex: 1;
+  min-height: 44px;
+  max-height: 96px;
+  resize: none;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--card);
+  padding: 11px 12px;
+  font-family: var(--serif);
+  font-size: 14px;
+  color: var(--ink);
+  line-height: 1.5;
+}
+.p-composer__input::placeholder { color: var(--ink-2); }
+.p-composer__input:focus { outline: none; border-color: var(--teal); }
+.p-composer__send {
+  flex: none;
+  width: 44px;
+  height: 44px;
+  border: 0;
+  background: var(--teal);
+  color: #fff;
+  font-family: var(--sans);
+  font-size: 12px;
+  letter-spacing: .04em;
+  cursor: pointer;
+}
+.p-composer__send:hover { background: var(--teal-deep); }
+
+/* ---------- 科室列表（模拟挂号页） ---------- */
+.p-deptlist { display: flex; flex-direction: column; gap: 8px; }
+.p-dept {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 10px 14px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  cursor: pointer;
+  text-align: left;
+  font-family: var(--serif);
+  font-size: 14.5px;
+  color: var(--ink);
+}
+.p-dept--rec {
+  border-color: var(--teal);
+  box-shadow: inset 3px 0 0 var(--teal);
+}
+.p-dept--on {
+  background: var(--teal);
+  border-color: var(--teal);
+  color: #fff;
+}
+.p-dept__hint {
+  font-family: var(--sans);
+  font-size: 10.5px;
+  letter-spacing: .14em;
+  color: var(--teal);
+}
+.p-dept--on .p-dept__hint { color: #fff; }
+
+/* ---------- 空状态 ---------- */
+.p-empty {
+  padding: 48px 24px;
+  text-align: center;
+  color: var(--ink-2);
+  font-size: 13.5px;
+}
+
+/* ---------- 动效降级 ---------- */
+@media (prefers-reduced-motion: reduce) {
+  .patient-root * { transition: none !important; animation: none !important; }
+}
