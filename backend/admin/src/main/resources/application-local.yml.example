@@ -1,15 +1,19 @@
 # 私密配置模板：cp application.yml 同目录为 application-local.yml，填真实值（不提交）
 # 该文件由 spring.profiles.active=local 叠加覆盖 application.yml
 
-llm:
-  deepseek:
-    api-key: sk-xxx
-  dashscope:
-    api-key: sk-xxx
-
 spring:
   datasource:
     password: real-mysql-password
   data:
     redis:
       password: real-redis-password
+
+minio:
+  access-key: real-minio-access-key
+  secret-key: real-minio-secret-key
+
+llm:
+  deepseek:
+    api-key: sk-xxx
+  dashscope:
+    api-key: sk-xxx
