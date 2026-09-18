@@ -12,6 +12,12 @@ minio:
   access-key: real-minio-access-key
   secret-key: real-minio-secret-key
 
+pgvector:
+  password: real-pgvector-password
+
+elasticsearch:
+  password: real-es-password
+
 llm:
   deepseek:
     api-key: sk-xxx

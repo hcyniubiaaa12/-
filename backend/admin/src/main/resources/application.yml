@@ -23,6 +23,22 @@ minio:
   secret-key: ${MINIO_SECRET_KEY:}
   bucket: ${MINIO_BUCKET:guide}
 
+# 向量库（PostgreSQL + pgvector）——管语义，独立于上面 MySQL 主数据源；
+# 写入方：kb（RAG 语料）与 feedback（聚类锚点，见数据库设计 4.1）
+pgvector:
+  url: jdbc:postgresql://${PGVECTOR_HOST:192.168.193.131}:${PGVECTOR_PORT:5432}/${PGVECTOR_DB:guide_vec}
+  username: ${PGVECTOR_USER:postgres}
+  password: ${PGVECTOR_PASSWORD:}
+  # 与阿里 text-embedding-v3 对齐；换 embedding 模型需同步改维度并重建向量
+  dimension: ${PGVECTOR_DIM:1024}
+
+# Elasticsearch——chunk 全文检索（BM25）+ 医疗术语聚合；写入方：kb（唯一写入口）
+elasticsearch:
+  uris: ${ES_URIS:http://192.168.193.131:9200}
+  username: ${ES_USERNAME:}
+  password: ${ES_PASSWORD:}
+  chunk-index: ${ES_CHUNK_INDEX:guide_chunk}
+
 mybatis-plus:
   # 枚举包：@EnumValue 标注的编码字段自动装载（见《数据库设计.md》§0）
   type-enums-package: com.guide.auth.enums,com.guide.chat.enums,com.guide.kb.enums,com.guide.feedback.enums,com.guide.async.enums
