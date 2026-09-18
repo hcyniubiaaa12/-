@@ -145,7 +145,7 @@ CREATE TABLE IF NOT EXISTS `kb_chunk` (
     `updated_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     KEY `idx_kc_doc` (`doc_id`)
-) ENGINE=InnoDB COMMENT='知识片段表：MySQL 存事实，向量在 pgvector 同步；回流 approve 的合成 chunk 也写这里（闭环生效唯一机制）';
+) ENGINE=InnoDB COMMENT='知识片段表：MySQL 存事实，向量在 pgvector 同步；回流 approve 的合成 chunk（文本 LLM 生成、管理员预览定稿）也写这里（闭环生效唯一机制）';
 
 CREATE TABLE IF NOT EXISTS `dept_mapping` (
     `id`             VARCHAR(32)  NOT NULL,
@@ -157,8 +157,8 @@ CREATE TABLE IF NOT EXISTS `dept_mapping` (
     `created_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
-    KEY `idx_dm_symptom` (`symptom`)
-) ENGINE=InnoDB COMMENT='症状交叉映射台账；运行时不被 RAG 消费（闭环生效靠合成 chunk），仅管理端维护与审核事实记录';
+    UNIQUE KEY `uk_dm_symptom_main` (`symptom`, `main_dept_id`)
+) ENGINE=InnoDB COMMENT='症状交叉映射台账；运行时不被 RAG 消费（闭环生效靠合成 chunk），仅管理端维护与审核事实记录；键=(症状原文,主科室)：同键合并交叉并集、异键新行';
 
 CREATE TABLE IF NOT EXISTS `medical_term` (
     `id`         VARCHAR(32)  NOT NULL,
@@ -213,7 +213,7 @@ CREATE TABLE IF NOT EXISTS `cluster_bucket` (
     `anchor_text`    VARCHAR(512) NOT NULL COMMENT '锚点文本（固定不漂移）',
     `exact_key`      VARCHAR(255) NOT NULL COMMENT '精确归桶键',
     `count`          INT          NOT NULL DEFAULT 1 COMMENT '累计次数',
-    `status`         VARCHAR(32)  NOT NULL DEFAULT 'monitoring' COMMENT '枚举：monitoring/pending/approved/rejected/dismissed',
+    `status`         VARCHAR(32)  NOT NULL DEFAULT 'monitoring' COMMENT '枚举：monitoring/pending/approved/rejected/dismissed；rejected=审过否定/dismissed=未审清理；终态可人工修正重审回 pending',
     `deleted`        TINYINT      NOT NULL DEFAULT 0,
     `created_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`     DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -228,7 +228,7 @@ CREATE TABLE IF NOT EXISTS `review_task` (
     `status`         VARCHAR(32) NOT NULL DEFAULT 'pending' COMMENT '枚举：pending/done',
     `reviewed_by`    VARCHAR(32) NULL COMMENT '审核人',
     `reviewed_at`    DATETIME    NULL COMMENT '审核时间',
-    `result_dept_id` VARCHAR(32) NULL COMMENT '审核结果科室（人工 approve 唯一写知识库路径）',
+    `main_dept_id`   VARCHAR(32) NULL COMMENT '主科室：审核给出的修正目标（人工 approve 唯一写知识库路径）',
     `deleted`        TINYINT     NOT NULL DEFAULT 0,
     `created_at`     DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at`     DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,

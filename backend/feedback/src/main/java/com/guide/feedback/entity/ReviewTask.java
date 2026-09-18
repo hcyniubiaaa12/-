@@ -24,5 +24,6 @@ public class ReviewTask extends BaseEntity {
 
     private LocalDateTime reviewedAt;
 
-    private String resultDeptId;
+    /** 主科室：审核给出的修正目标（唯一写知识库路径是人工 approve） */
+    private String mainDeptId;
 }
