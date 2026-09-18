@@ -40,7 +40,7 @@ backend/
 - 依赖方向：admin → 各业务模块 → rag → llm；所有模块 → common；禁止反向与循环
 - rag 不依赖业务模块，不感知业务状态（会话、用户）
 - chat 不得直连向量库、ES 与 LLM，只经 rag → llm
-- kb 是唯一写向量库与 ES chunk 索引入口（上传流水线 + 回流同步，双写同事务边界）
+- kb 是唯一写向量库与 ES chunk 索引入口（上传流水线 + 回流同步，双写同事务边界）；聚类锚点向量除外，归 feedback 模块直写 pgvector（见数据库设计 cluster_bucket_vec）
 - feedback 只读导诊记录、只写映射与知识片段；埋点旁路，不阻塞主流程
 - async 线程池与在线导诊线程隔离，不共用
 - 回流只前向修正，不回改历史导诊记录；写知识库唯一路径是人工 approve
