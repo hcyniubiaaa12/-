@@ -13,11 +13,36 @@ const routes = [
     meta: { requiresAdmin: true },
     children: [
       { path: '', redirect: '/admin/dashboard' },
-      { path: 'dashboard', name: 'dashboard', component: () => import('../views/admin/Dashboard.vue') },
-      { path: 'kb', name: 'kb', component: () => import('../views/admin/KbManage.vue') },
-      { path: 'review', name: 'review', component: () => import('../views/admin/Review.vue') },
-      { path: 'llm', name: 'llm-config', component: () => import('../views/admin/LlmConfig.vue') },
-      { path: 'users', name: 'users', component: () => import('../views/admin/UserManage.vue') }
+      {
+        path: 'dashboard',
+        name: 'dashboard',
+        component: () => import('../views/admin/Dashboard.vue'),
+        meta: { title: '数据看板', sub: '近 7 天 · 口径：已反馈导诊记录' }
+      },
+      {
+        path: 'kb',
+        name: 'kb',
+        component: () => import('../views/admin/KbManage.vue'),
+        meta: { title: '知识库管理', sub: '科室 / 文档 / 映射 / 术语白名单' }
+      },
+      {
+        path: 'review',
+        name: 'review',
+        component: () => import('../views/admin/Review.vue'),
+        meta: { title: '审核队列', sub: '错误模式聚合 · 人工确认后回流' }
+      },
+      {
+        path: 'users',
+        name: 'users',
+        component: () => import('../views/admin/UserManage.vue'),
+        meta: { title: '用户管理', sub: '账号状态 · 敏感词库' }
+      },
+      {
+        path: 'llm',
+        name: 'llm-config',
+        component: () => import('../views/admin/LlmConfig.vue'),
+        meta: { title: 'LLM 配置', sub: 'DeepSeek 对话 / 阿里 embedding / rerank' }
+      }
     ]
   }
 ]
