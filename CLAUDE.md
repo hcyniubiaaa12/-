@@ -62,11 +62,17 @@ scope：common / chat / kb / feedback / auth / admin / patient / rag / llm / asy
 配置分工：`application.yml` 公共配置（占位符 `${...}`，提交）；`application-local.yml` 私密配置（真实密钥，不提交，已 gitignore）。
 新增密钥流程：cp application.yml application-local.yml → 在 local 填真实值 → 正常启动（active 叠加覆盖）；同时更新 `application-local.yml.example` 模板（占位符，提交）。
 
-## 5. 功能完成后的校验（提交前逐项过）
+## 5. 开发前置（开工前必读）
+
+- 开始任何功能改动前，先读 `CONTEXT.md`（领域词汇表）：领域术语以它为准，代码、文档、接口命名与词表保持一致
+- 遇到词表未覆盖的新领域概念，先把词条补进 `CONTEXT.md` 再写代码；发现用词与词表冲突，先改词表再动手
+
+## 6. 功能完成后的校验（提交前逐项过）
 
 - 数据流：entity / mapper / dto / 前端 api / 页面五处同步；检查统计看板、导出、关联页面是否漏改
 - 检索存储双写：chunk 改动必须同步 pgvector 与 ES 两路（索引/删除均同事务边界）
 - 约束：无新中间件；依赖方向未破坏；未绕过 LLM 适配层；埋点未侵入主流程；线程池未混用
 - 验证：后端编译通过；接口真实请求跑通；涉及链路 A/B/C/D 时核对基线文档对齐点
 - 文档：涉及链路对齐点、参数、模块边界的改动，同步更新《总体架构与链路设计.md》
+- 术语：新增/变更领域概念时同步更新 `CONTEXT.md`
 - 校验：功能修改后检查 `.claude/rules/` 下全部文档（数据库设计.md、前端设计方案.md）是否过时，CLAUDE.md 本身同样校验；过时即同步更新
