@@ -23,6 +23,15 @@
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
         </dependency>
+        <!-- 聚合来源：guide_record（chat）+ cluster_bucket / root_cause（feedback） -->
+        <dependency>
+            <groupId>com.guide</groupId>
+            <artifactId>chat</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.guide</groupId>
+            <artifactId>feedback</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>

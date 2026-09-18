@@ -23,6 +23,15 @@
             <groupId>com.baomidou</groupId>
             <artifactId>mybatis-plus-spring-boot3-starter</artifactId>
         </dependency>
+        <!-- 只读导诊记录（chat.guide_record）、只写映射与知识片段（kb.dept_mapping / kb.kb_chunk） -->
+        <dependency>
+            <groupId>com.guide</groupId>
+            <artifactId>chat</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.guide</groupId>
+            <artifactId>kb</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>

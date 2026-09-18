@@ -27,6 +27,15 @@
             <groupId>com.guide</groupId>
             <artifactId>rag</artifactId>
         </dependency>
+        <!-- 入口前置校验：敏感词读 auth.sensitive_word，术语白名单读 kb.medical_term -->
+        <dependency>
+            <groupId>com.guide</groupId>
+            <artifactId>auth</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.guide</groupId>
+            <artifactId>kb</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>
