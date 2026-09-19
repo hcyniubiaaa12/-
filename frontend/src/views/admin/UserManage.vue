@@ -29,12 +29,17 @@
       <div class="a-table__ops" style="margin-bottom: 12px">
         <el-input
           v-model="userQuery"
-          placeholder="用户名 / 昵称搜索"
+          placeholder="搜索用户名 / 昵称"
           clearable
-          style="width: 220px"
+          style="width: 240px"
           @keyup.enter="loadUsers(1)"
-        />
-        <el-button size="small" @click="loadUsers(1)">搜索</el-button>
+          @clear="loadUsers(1)"
+        >
+          <template #prefix>
+            <el-icon><Search /></el-icon>
+          </template>
+        </el-input>
+        <el-button type="primary" size="small" @click="loadUsers(1)">搜索</el-button>
       </div>
 
       <el-table :data="users" v-loading="userLoading" empty-text="无匹配账号">
@@ -172,6 +177,7 @@
 <script setup>
 import { ref, reactive, onMounted } from 'vue'
 import { ElMessage, ElMessageBox } from 'element-plus'
+import { Search } from '@element-plus/icons-vue'
 import {
   pageUsers, banUser, unbanUser,
   pageWords, addWord, importWords, toggleWord, convertWordToBanned, deleteWord

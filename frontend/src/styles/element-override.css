@@ -6,16 +6,17 @@
    ============================================================ */
 
 :root {
-  /* 主色 → 冷靛蓝 */
-  --el-color-primary: #3B82C4;
-  --el-color-primary-dark-2: #2A6399;
-  --el-color-primary-light-3: #6da3d4;
-  --el-color-primary-light-5: #93bcdf;
-  --el-color-primary-light-7: #bdd6ec;
-  --el-color-primary-light-8: #d3e3f3;
-  --el-color-primary-light-9: #eaf0f9; /* = --wash */
+  /* 主色 → 冷靛蓝（B3：主色向靛收敛） */
+  --el-color-primary: #4468B8;
+  --el-color-primary-dark-2: #33518F;
+  --el-color-primary-light-3: #708dc9;
+  --el-color-primary-light-5: #9db3d9;
+  --el-color-primary-light-7: #c6d2ea;
+  --el-color-primary-light-8: #d9e1f1;
+  --el-color-primary-light-9: #EDF1F9; /* = --wash */
+  --el-color-primary-lighter: #A8B0C3;
 
-  /* 语义色 → 方案 B 色板 */
+  /* 语义色 → 方案 B 色板（coral/moss/err 与患者端同明度域，不动） */
   --el-color-success: #4A7C59;
   --el-color-warning: #E06B4D;
   --el-color-danger: #A94438;
@@ -25,13 +26,16 @@
   --el-text-color-primary: #1B2740;
   --el-text-color-regular: #1B2740;
   --el-text-color-secondary: #66718C;
+  --el-text-color-placeholder: #A8B0C3;
+  --el-text-color-disabled: #A8B0C3;
   --el-border-color: #D9E0EE;
   --el-border-color-light: #D9E0EE;
   --el-border-color-lighter: #D9E0EE;
-  --el-fill-color-light: #EAF0F9;
+  --el-fill-color-light: #EDF1F9;
   --el-fill-color-blank: #FFFFFF;
   --el-bg-color: #FFFFFF;
   --el-bg-color-overlay: #FFFFFF;
+  --el-mask-color: rgba(27, 39, 64, .45);
 
   /* 形状与字体：直角语言 + 无衬线 */
   --el-border-radius-base: 0;
@@ -51,9 +55,47 @@
   font-weight: 600;
 }
 
-/* 按钮：直角小号 */
+/* 按钮：直角小号，默认/小号统一 32px 高，与输入框对齐 */
 .admin-root .el-button {
   font-weight: 400;
+  height: 32px;
+  padding: 0 15px;
+  border-radius: 5px;
+}
+.admin-root .el-button--small {
+  height: 32px;
+  padding: 0 13px;
+  font-size: 12.5px;
+}
+.admin-root .el-button.is-link {
+  height: auto;
+  padding: 0;
+}
+
+/* 输入框：B3 色板 hover/focus，placeholder 用 --dis-text */
+.admin-root .el-input__wrapper,
+.admin-root .el-textarea__inner {
+  background-color: var(--card);
+  box-shadow: 0 0 0 1px var(--line) inset;
+  transition: box-shadow .18s ease;
+}
+.admin-root .el-input__wrapper:hover,
+.admin-root .el-textarea__inner:hover {
+  box-shadow: 0 0 0 1px var(--blue-side) inset;
+}
+.admin-root .el-input__wrapper.is-focus,
+.admin-root .el-textarea__inner:focus {
+  box-shadow: 0 0 0 1px var(--blue) inset;
+}
+.admin-root .el-input__inner::placeholder,
+.admin-root .el-textarea__inner::placeholder {
+  color: var(--dis-text);
+}
+/* 禁用态：浅灰底 */
+.admin-root .el-input.is-disabled .el-input__wrapper,
+.admin-root .el-textarea.is-disabled .el-textarea__inner {
+  background-color: #EEF1F6;
+  box-shadow: 0 0 0 1px var(--line) inset;
 }
 
 /* 分页器靠右 */
