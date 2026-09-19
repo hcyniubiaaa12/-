@@ -25,16 +25,24 @@ public class SysConfigService {
     public static final String KEY_LOW_CONFIDENCE = "guide.low.confidence";
     public static final String KEY_TERM_MANUAL_REVIEW = "term.manual.review";
 
+    /** 进程内缓存存活时长：管理端改参数后无需重启，最长一分钟生效 */
+    private static final long CACHE_TTL_MS = 60_000L;
+
     private final SysConfigMapper sysConfigMapper;
-    private final Map<String, String> cache = new ConcurrentHashMap<>();
+    private final Map<String, CacheEntry> cache = new ConcurrentHashMap<>();
 
     public String get(String key, String defaultValue) {
-        String value = cache.computeIfAbsent(key, k -> {
+        long now = System.currentTimeMillis();
+        CacheEntry entry = cache.compute(key, (k, old) -> {
+            if (old != null && now - old.loadedAt() <= CACHE_TTL_MS) {
+                return old;
+            }
             SysConfig config = sysConfigMapper.selectOne(
                     com.baomidou.mybatisplus.core.toolkit.Wrappers.<SysConfig>lambdaQuery()
                             .eq(SysConfig::getConfigKey, k).last("LIMIT 1"));
-            return config == null ? "" : config.getConfigValue();
+            return new CacheEntry(config == null ? "" : config.getConfigValue(), now);
         });
+        String value = entry.value();
         return value == null || value.isBlank() ? defaultValue : value;
     }
 
@@ -60,8 +68,11 @@ public class SysConfigService {
         return Boolean.parseBoolean(get(key, String.valueOf(defaultValue)).trim());
     }
 
-    /** 管理端改参数后失效重建 */
+    /** 管理端改参数后失效重建（不调也有 60s TTL 兜底） */
     public void refresh() {
         cache.clear();
+    }
+
+    private record CacheEntry(String value, long loadedAt) {
     }
 }
