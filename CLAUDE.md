@@ -60,7 +60,8 @@ type：feat / fix / docs / style / refactor / perf / test / chore。
 scope：common / chat / kb / feedback / auth / admin / patient / rag / llm / async / stats。
 
 密钥安全：配置文件（application.yml、.env 等）含密钥/API Key 时，提交前必须提醒用户不要提交。
-配置分工：`application.yml` 公共配置（占位符 `${...}`，提交）；`application-local.yml` 私密配置（真实密钥，不提交，已 gitignore）。
+配置分工：`application.yml` 公共配置（占位符 `${...}`，提交）；`application-local.yml` 私密配置（真实密钥，不提交，已 gitignore）；`prompts.yml` 提示词配置（导诊主提示词/查询改写/话术，经 `spring.config.import` 引入，改提示词不改代码，启动时校验占位符完整性）。
+日志：链路 A 关键节点（入口校验/召回/融合/精排/生成/解析/落库）打 INFO 且带轮次标记 `[sXXXXXX-rN]`（MDC `turn`），需要模型请求与召回明细时把 `com.guide.rag`/`com.guide.llm` 调到 DEBUG。
 新增密钥流程：cp application.yml application-local.yml → 在 local 填真实值 → 正常启动（active 叠加覆盖）；同时更新 `application-local.yml.example` 模板（占位符，提交）。
 
 ## 5. 开发前置（开工前必读）
