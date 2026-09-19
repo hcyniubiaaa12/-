@@ -4,11 +4,12 @@
 # AI 工作记忆目录（本地数据，不入库）
 .workbuddy/
 
-# 构建产物
+# 构建产物与运行日志
 node_modules/
 dist/
 target/
 *.class
+logs/
 
 # IDE
 .idea/
