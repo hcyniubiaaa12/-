@@ -43,7 +43,10 @@ public class AnswerParser {
             if (json == null) {
                 return RagAnswer.ask(modelOutput.trim());
             }
-            return buildAnswer("", json);
+            // JSON 之前的自然语言才是可见回复；解析失败时退回模型全文（不能把已流出的追问丢成空串）
+            int jsonStart = modelOutput.indexOf(json);
+            String visible = jsonStart > 0 ? modelOutput.substring(0, jsonStart).trim() : "";
+            return buildAnswer(visible, modelOutput.trim(), json);
         }
         String reply = modelOutput.substring(0, markerIndex).trim();
         String json = extractJsonObject(modelOutput.substring(markerIndex + MARKER.length()));
@@ -51,19 +54,23 @@ public class AnswerParser {
             log.warn("模型输出了结论分隔符但没有合法 JSON，按追问处理：{}", abbreviate(modelOutput));
             return RagAnswer.ask(reply);
         }
-        return buildAnswer(reply, json);
+        return buildAnswer(reply, reply, json);
     }
 
-    private RagAnswer buildAnswer(String reply, String json) {
+    /**
+     * @param reply         可见的自然语言回复（分隔符/JSON 之前的部分）
+     * @param fallbackReply JSON 不可用时的兜底回复（退回追问，保证患者不看到空白气泡）
+     */
+    private RagAnswer buildAnswer(String reply, String fallbackReply, String json) {
         RawResult raw;
         try {
             raw = objectMapper.readValue(json, RawResult.class);
         } catch (Exception e) {
             log.warn("结论 JSON 解析失败，按追问处理：{}", abbreviate(json));
-            return RagAnswer.ask(reply);
+            return RagAnswer.ask(fallbackReply);
         }
         if (raw == null || !StringUtils.hasText(raw.dept())) {
-            return RagAnswer.ask(reply);
+            return RagAnswer.ask(fallbackReply);
         }
 
         List<RagAnswer.DeptCandidate> top3 = new ArrayList<>();
