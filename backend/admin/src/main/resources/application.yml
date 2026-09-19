@@ -51,6 +51,12 @@ mybatis-plus:
       logic-not-delete-value: 0
 
 # 真实密钥放 application-local.yml（不提交），此处只用占位符
+# JWT（链路 D）：secret 为 HS256 密钥（至少 32 字符）；登录态存 Redis，登出/过期即时失效
+jwt:
+  secret: ${JWT_SECRET:}
+  expire-hours: ${JWT_EXPIRE_HOURS:24}
+  redis-key-prefix: ${JWT_REDIS_KEY_PREFIX:auth:token:}
+
 llm:
   deepseek:
     api-key: ${DEEPSEEK_API_KEY:}

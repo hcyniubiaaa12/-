@@ -285,7 +285,10 @@ CREATE TABLE IF NOT EXISTS `ingest_task` (
 -- ------------------------------------------------------------
 
 INSERT INTO `user` (`id`, `username`, `password`, `role`, `nickname`, `status`)
-VALUES ('1', 'admin', '$2a$10$EblZqNptyYvcLm/VwDCVAuBjzZOI7khzdyGPBr08PpIi0G6R9Q9ca', 'admin', '系统管理员', 'normal')
+VALUES
+('1', 'admin',   '$2a$10$cFq.XOvb3iQqj1AyM/Pv1eZYgA61LoOXza0g/hVpGLp1RPYhg6CCe', 'admin', '系统管理员', 'normal'),
+('2', 'admin02', '$2a$10$cFq.XOvb3iQqj1AyM/Pv1eZYgA61LoOXza0g/hVpGLp1RPYhg6CCe', 'admin', '管理员二号', 'normal'),
+('3', 'admin03', '$2a$10$cFq.XOvb3iQqj1AyM/Pv1eZYgA61LoOXza0g/hVpGLp1RPYhg6CCe', 'admin', '管理员三号', 'normal')
 ON DUPLICATE KEY UPDATE `updated_at` = `updated_at`;
 
 INSERT INTO `sys_config` (`id`, `config_key`, `config_value`, `remark`) VALUES

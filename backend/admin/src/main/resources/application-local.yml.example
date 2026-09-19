@@ -18,6 +18,9 @@ pgvector:
 elasticsearch:
   password: real-es-password
 
+jwt:
+  secret: replace-with-at-least-32-chars-random-secret-key
+
 llm:
   deepseek:
     api-key: sk-xxx
