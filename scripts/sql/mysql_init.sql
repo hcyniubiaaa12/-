@@ -61,12 +61,13 @@ CREATE TABLE IF NOT EXISTS `chat_session` (
     `user_id`    VARCHAR(32) NOT NULL COMMENT '用户 id',
     `status`     VARCHAR(32) NOT NULL DEFAULT 'ongoing' COMMENT '枚举：ongoing/closed；register_success 即置 closed',
     `ask_round`  INT         NOT NULL DEFAULT 0 COMMENT '追问轮次 0–3',
+    `has_result` TINYINT     NOT NULL DEFAULT 0 COMMENT '0/1 已出导诊结论（新主诉判定双信号之一）',
     `deleted`    TINYINT     NOT NULL DEFAULT 0,
     `created_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     `updated_at` DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (`id`),
     KEY `idx_cs_user` (`user_id`)
-) ENGINE=InnoDB COMMENT='会话表：一条主诉一个会话；同聊天页新输入=开新会话（判定信号是会话状态）';
+) ENGINE=InnoDB COMMENT='会话表：一条主诉一个会话；同聊天页新输入=开新会话（判定双信号：has_result=1 或 status=closed）';
 
 CREATE TABLE IF NOT EXISTS `chat_message` (
     `id`         VARCHAR(32) NOT NULL,
@@ -296,6 +297,7 @@ INSERT INTO `sys_config` (`id`, `config_key`, `config_value`, `remark`) VALUES
 ('c02', 'guide.upgrade.rounds',      '3',    '追问升级阈值（轮次）'),
 ('c03', 'guide.low.confidence',      '0.5',  '低置信度阈值'),
 ('c04', 'term.manual.review',        'true', '术语人工审核开关'),
-('c05', 'retrieve.top.k',            '10',   '向量召回 Top-K'),
-('c06', 'retrieve.top.n',            '5',    '重排后 Top-N')
+('c05', 'retrieve.top.k',            '10',   '单路召回 Top-K（向量 / ES 各取）'),
+('c06', 'retrieve.top.n',            '5',    '重排后 Top-N（进 Prompt）'),
+('c07', 'chat.ask.max.rounds',       '3',    '追问轮数上限（超限强制出低置信度结论）')
 ON DUPLICATE KEY UPDATE `updated_at` = `updated_at`;
