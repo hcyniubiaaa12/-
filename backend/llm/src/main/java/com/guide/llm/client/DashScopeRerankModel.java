@@ -15,7 +15,8 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * 阿里 gte-rerank-v2（DashScope 原生接口 /api/v1/services/rerank/text-rerank/text-rerank）。
+ * 阿里 rerank（DashScope 原生接口 /api/v1/services/rerank/text-rerank/text-rerank，模型名可配，
+ * 默认见 application.yml 的 llm.dashscope.rerank-model）。
  * 输入 = 查询 + 候选正文，输出 = 相关度降序的下标与分数。
  */
 @Slf4j

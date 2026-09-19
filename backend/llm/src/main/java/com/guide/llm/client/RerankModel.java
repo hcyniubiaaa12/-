@@ -3,7 +3,7 @@ package com.guide.llm.client;
 import java.util.List;
 
 /**
- * 重排模型接口（LLM 适配层唯一出口之一）：阿里 gte-rerank-v2。
+ * 重排模型接口（LLM 适配层唯一出口之一）：阿里 rerank（模型名可配）。
  * rag 层对 RRF 融合后的候选做精排，产出 Top-N 与分数（分数随片段透传入 Prompt，
  * 作为模型自报置信度的客观锚点，见链路 A 对齐点）。
  */

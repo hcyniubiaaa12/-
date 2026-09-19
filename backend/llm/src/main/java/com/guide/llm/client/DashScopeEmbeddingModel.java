@@ -41,7 +41,8 @@ public class DashScopeEmbeddingModel implements EmbeddingModel {
         if (texts == null || texts.isEmpty()) {
             return List.of();
         }
-        int batchSize = properties.getDashscope().getEmbeddingBatchSize();
+        // 批大小下限兜底：配 0/负数会让下面的 for 步进为 0 变成死循环（不断发真实请求）
+        int batchSize = Math.max(1, properties.getDashscope().getEmbeddingBatchSize());
         List<float[]> vectors = new ArrayList<>(texts.size());
         for (int from = 0; from < texts.size(); from += batchSize) {
             int to = Math.min(from + batchSize, texts.size());
@@ -67,7 +68,10 @@ public class DashScopeEmbeddingModel implements EmbeddingModel {
         // 按 index 回填，保证与入参顺序一致
         float[][] ordered = new float[batch.size()][];
         for (JsonNode item : data) {
-            int index = item.path("index").asInt();
+            int index = item.path("index").asInt(-1);
+            if (index < 0 || index >= batch.size()) {
+                throw new BizException(ErrorCode.LLM_CALL_FAILED, "embedding 返回越界下标：" + index);
+            }
             JsonNode embedding = item.path("embedding");
             float[] vector = new float[embedding.size()];
             for (int i = 0; i < embedding.size(); i++) {
@@ -75,6 +79,12 @@ public class DashScopeEmbeddingModel implements EmbeddingModel {
             }
             validateDimension(vector);
             ordered[index] = vector;
+        }
+        for (int i = 0; i < ordered.length; i++) {
+            if (ordered[i] == null) {
+                // 上游漏返回某条（重复/缺失下标）：明确报错，别让 NPE 冒到上层
+                throw new BizException(ErrorCode.LLM_CALL_FAILED, "embedding 未返回第 " + i + " 条的向量");
+            }
         }
         return List.of(ordered);
     }
