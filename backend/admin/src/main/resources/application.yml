@@ -39,6 +39,12 @@ elasticsearch:
   password: ${ES_PASSWORD:}
   chunk-index: ${ES_CHUNK_INDEX:guide_chunk}
 
+# 演示种子数据（开发夹具）：true 时启动装载 7 科室语料 + 术语白名单（科室表非空即跳过）
+# 链路 B 上传流水线就绪后本开关即可关闭
+guide:
+  seed:
+    enabled: ${GUIDE_SEED_ENABLED:false}
+
 mybatis-plus:
   # 枚举包：@EnumValue 标注的编码字段自动装载（见《数据库设计.md》§0）
   type-enums-package: com.guide.auth.enums,com.guide.chat.enums,com.guide.kb.enums,com.guide.feedback.enums,com.guide.async.enums
@@ -66,4 +72,4 @@ llm:
     api-key: ${DASHSCOPE_API_KEY:}
     base-url: ${DASHSCOPE_BASE_URL:https://dashscope.aliyuncs.com}
     embedding-model: ${EMBEDDING_MODEL:text-embedding-v3}
-    rerank-model: ${RERANK_MODEL:gte-rerank-v2}
+    rerank-model: ${RERANK_MODEL:qwen3-rerank}
