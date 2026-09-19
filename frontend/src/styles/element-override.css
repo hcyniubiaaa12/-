@@ -1,0 +1,64 @@
+/* ============================================================
+   Element Plus 主题覆盖 —— 映射到管理端「冷靛控制台」方案 B 色板
+   挂 :root：EP 弹层（dialog/select 下拉/Message）teleport 到 body，
+   挂 .admin-root 覆盖不到；患者端不使用 EP 组件，全局变量无影响；
+   组件默认蓝/橙/绿全部对齐方案 B 的 blue/coral/moss，直角语言一致
+   ============================================================ */
+
+:root {
+  /* 主色 → 冷靛蓝 */
+  --el-color-primary: #3B82C4;
+  --el-color-primary-dark-2: #2A6399;
+  --el-color-primary-light-3: #6da3d4;
+  --el-color-primary-light-5: #93bcdf;
+  --el-color-primary-light-7: #bdd6ec;
+  --el-color-primary-light-8: #d3e3f3;
+  --el-color-primary-light-9: #eaf0f9; /* = --wash */
+
+  /* 语义色 → 方案 B 色板 */
+  --el-color-success: #4A7C59;
+  --el-color-warning: #E06B4D;
+  --el-color-danger: #A94438;
+  --el-color-error: #A94438;
+
+  /* 中性色 → 方案 B */
+  --el-text-color-primary: #1B2740;
+  --el-text-color-regular: #1B2740;
+  --el-text-color-secondary: #66718C;
+  --el-border-color: #D9E0EE;
+  --el-border-color-light: #D9E0EE;
+  --el-border-color-lighter: #D9E0EE;
+  --el-fill-color-light: #EAF0F9;
+  --el-fill-color-blank: #FFFFFF;
+  --el-bg-color: #FFFFFF;
+  --el-bg-color-overlay: #FFFFFF;
+
+  /* 形状与字体：直角语言 + 无衬线 */
+  --el-border-radius-base: 0;
+  --el-border-radius-small: 0;
+  --el-font-family: 'PingFang SC', 'Microsoft YaHei', sans-serif;
+}
+
+/* 表格：表头用 wash 底，行 hover 用 wash */
+.admin-root .el-table {
+  --el-table-header-bg-color: var(--wash);
+  --el-table-header-text-color: var(--ink);
+  --el-table-row-hover-bg-color: var(--wash);
+  --el-table-border-color: var(--line);
+  font-size: 12.5px;
+}
+.admin-root .el-table th.el-table__cell {
+  font-weight: 600;
+}
+
+/* 按钮：直角小号 */
+.admin-root .el-button {
+  font-weight: 400;
+}
+
+/* 分页器靠右 */
+.admin-root .el-pagination {
+  justify-content: flex-end;
+  margin-top: 12px;
+  color: var(--ink-2);
+}
