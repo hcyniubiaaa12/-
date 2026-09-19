@@ -43,11 +43,17 @@ public class DashScopeEmbeddingModel implements EmbeddingModel {
         }
         // 批大小下限兜底：配 0/负数会让下面的 for 步进为 0 变成死循环（不断发真实请求）
         int batchSize = Math.max(1, properties.getDashscope().getEmbeddingBatchSize());
+        long start = System.currentTimeMillis();
         List<float[]> vectors = new ArrayList<>(texts.size());
         for (int from = 0; from < texts.size(); from += batchSize) {
             int to = Math.min(from + batchSize, texts.size());
             List<String> batch = texts.subList(from, to).stream().map(this::normalize).toList();
             vectors.addAll(embedOneBatch(batch));
+        }
+        if (log.isDebugEnabled()) {
+            log.debug("向量化：model={} 文本={} 条｜批大小={}｜维度={}｜耗时 {} ms",
+                    properties.getDashscope().getEmbeddingModel(), texts.size(), batchSize,
+                    properties.getDashscope().getEmbeddingDimension(), System.currentTimeMillis() - start);
         }
         return vectors;
     }

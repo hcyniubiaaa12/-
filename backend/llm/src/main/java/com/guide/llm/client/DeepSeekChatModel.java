@@ -36,13 +36,21 @@ public class DeepSeekChatModel implements ChatModel {
     @Override
     public String chat(List<ChatMsg> messages) {
         requireKey();
+        long start = System.currentTimeMillis();
         JsonNode response = http.postJson(url(), authHeaders(), requestBody(messages, false));
-        return response.path("choices").path(0).path("message").path("content").asText("");
+        String content = response.path("choices").path(0).path("message").path("content").asText("");
+        if (log.isDebugEnabled()) {
+            log.debug("对话模型（非流式）：model={} 消息={} 条｜耗时 {} ms｜输出 {} 字",
+                    properties.getDeepseek().getModel(), messages.size(),
+                    System.currentTimeMillis() - start, content.length());
+        }
+        return content;
     }
 
     @Override
     public String chatStream(List<ChatMsg> messages, Consumer<String> onDelta) {
         requireKey();
+        long start = System.currentTimeMillis();
         StringBuilder full = new StringBuilder();
         http.postStream(url(), authHeaders(), requestBody(messages, true), line -> {
             String payload = ssePayload(line);
@@ -61,6 +69,11 @@ public class DeepSeekChatModel implements ChatModel {
                 log.debug("跳过无法解析的流式分片：{}", payload);
             }
         });
+        if (log.isDebugEnabled()) {
+            log.debug("对话模型（流式）：model={} 消息={} 条｜耗时 {} ms｜输出 {} 字",
+                    properties.getDeepseek().getModel(), messages.size(),
+                    System.currentTimeMillis() - start, full.length());
+        }
         return full.toString();
     }
 

@@ -53,6 +53,7 @@ public class DashScopeRerankModel implements RerankModel {
         body.put("input", input);
         body.put("parameters", parameters);
 
+        long start = System.currentTimeMillis();
         JsonNode results = http.postJson(url(), authHeaders(), body).path("output").path("results");
         if (!results.isArray()) {
             throw new BizException(ErrorCode.LLM_CALL_FAILED, "rerank 返回结构异常");
@@ -60,6 +61,12 @@ public class DashScopeRerankModel implements RerankModel {
         List<RerankHit> hits = new ArrayList<>(results.size());
         for (JsonNode item : results) {
             hits.add(new RerankHit(item.path("index").asInt(), item.path("relevance_score").asDouble()));
+        }
+        if (log.isDebugEnabled()) {
+            log.debug("重排：model={} 候选={} 条 → 返回 {} 条｜耗时 {} ms｜分数 {}",
+                    properties.getDashscope().getRerankModel(), documents.size(), hits.size(),
+                    System.currentTimeMillis() - start,
+                    hits.stream().map(h -> String.format("%.4f", h.score())).toList());
         }
         return hits;
     }
