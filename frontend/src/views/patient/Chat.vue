@@ -3,7 +3,10 @@
     <!-- 顶栏：病历抬头式 -->
     <header class="p-topbar">
       <div class="p-topbar__title">智能导诊</div>
-      <div class="p-topbar__sub">分 诊 台 · 在 线</div>
+      <div class="p-topbar__ops">
+        <span class="p-topbar__sub">{{ user.nickname || '分 诊 台 · 在 线' }}</span>
+        <button class="p-topbar__logout" @click="onLogout">退 出</button>
+      </div>
     </header>
 
     <!-- 对话区 -->
@@ -103,9 +106,23 @@
 <script setup>
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
+import { useUserStore } from '../../stores/user'
+import { logout as apiLogout } from '../../api/auth'
 import '../../styles/patient.css'
 
 const router = useRouter()
+const user = useUserStore()
+
+// 退出登录：先调后端删 Redis 登录态（登出即时失效），再清本地态跳登录页；
+// 接口失败也照常清本地态，避免卡死
+async function onLogout() {
+  try {
+    await apiLogout()
+  } finally {
+    user.logout()
+    router.push('/login')
+  }
+}
 
 // —— 假数据：对话流 ——
 const messages = ref([

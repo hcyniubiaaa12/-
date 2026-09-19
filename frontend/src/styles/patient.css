@@ -65,6 +65,28 @@
   color: var(--ink-2);
 }
 
+/* 顶栏退出：文本按钮，与 sub 同级排版 */
+.p-topbar__ops {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.p-topbar__logout {
+  background: none;
+  border: 1px solid var(--line);
+  padding: 4px 10px;
+  font-family: var(--sans);
+  font-size: 10.5px;
+  letter-spacing: .18em;
+  color: var(--ink-2);
+  cursor: pointer;
+  transition: color .18s ease, border-color .18s ease;
+}
+.p-topbar__logout:hover {
+  color: var(--err);
+  border-color: var(--err);
+}
+
 /* ---------- 对话区 ---------- */
 .p-thread {
   display: flex;
@@ -371,4 +393,32 @@
 /* ---------- 动效降级 ---------- */
 @media (prefers-reduced-motion: reduce) {
   .patient-root * { transition: none !important; animation: none !important; }
+}
+
+/* ---------- 桌面端适配（≥768px）----------
+   手机浏览器保持全屏原生布局；电脑浏览器将移动版式收窄为
+   居中「病历单」列，避免整宽拉伸。色板与部件规范不变。 */
+@media (min-width: 768px) {
+  .patient-root .p-topbar,
+  .patient-root .p-thread,
+  .patient-root .p-steps,
+  .patient-root .p-composer,
+  .patient-root .p-reg__body {
+    width: 100%;
+    max-width: 720px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  /* 居中列两侧细线，营造病历单边界 */
+  .patient-root .p-topbar,
+  .patient-root .p-thread,
+  .patient-root .p-steps,
+  .patient-root .p-composer,
+  .patient-root .p-reg__body {
+    border-left: 1px solid var(--line);
+    border-right: 1px solid var(--line);
+  }
+  .patient-root .p-composer {
+    border-bottom: 1px solid var(--line);
+  }
 }
