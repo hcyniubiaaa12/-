@@ -24,4 +24,14 @@ public enum TrackStage {
     /** 入库编码值（英文小写，见《数据库设计.md》§0） */
     @EnumValue
     private final String code;
+
+    /** 按编码值匹配（前端传的是小写编码值，禁用 valueOf，见进度.md 已知坑） */
+    public static TrackStage fromCode(String code) {
+        for (TrackStage stage : values()) {
+            if (stage.code.equals(code)) {
+                return stage;
+            }
+        }
+        return null;
+    }
 }
