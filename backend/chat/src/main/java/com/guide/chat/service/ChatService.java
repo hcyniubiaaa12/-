@@ -1,0 +1,302 @@
+package com.guide.chat.service;
+
+import com.baomidou.mybatisplus.core.toolkit.Wrappers;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.guide.auth.service.SysConfigService;
+import com.guide.chat.config.ChatExecutorConfig;
+import com.guide.chat.dto.ChatDTO;
+import com.guide.chat.dto.SseEvents;
+import com.guide.chat.entity.ChatMessage;
+import com.guide.chat.entity.ChatSession;
+import com.guide.chat.enums.MessageRole;
+import com.guide.chat.enums.SessionStatus;
+import com.guide.chat.mapper.ChatMessageMapper;
+import com.guide.chat.mapper.ChatSessionMapper;
+import com.guide.chat.support.StreamGate;
+import com.guide.common.api.ErrorCode;
+import com.guide.common.exception.BizException;
+import com.guide.kb.entity.Dept;
+import com.guide.kb.service.DeptService;
+import com.guide.rag.RagService;
+import com.guide.rag.dto.DeptOption;
+import com.guide.rag.dto.RagAnswer;
+import com.guide.rag.dto.RagContext;
+import com.guide.rag.dto.RagRequest;
+import com.guide.rag.dto.RagTurn;
+import com.guide.rag.support.AnswerParser;
+import lombok.extern.slf4j.Slf4j;
+import org.springframework.beans.factory.annotation.Qualifier;
+import org.springframework.http.MediaType;
+import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
+import org.springframework.stereotype.Service;
+import org.springframework.util.StringUtils;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * 问诊对话编排（链路 A 主链路）。
+ * 单轮流：会话状态机 → 消息落库 → 敏感词入口前置校验 → 规则硬门槛 → RAG 检索
+ * → 流式生成（分流闸门逐字转发 delta）→ 解析 → 追问 或 结论落库 → result → done。
+ *
+ * <p>SSE 四态：delta（对话流）/ question（追问，不出结论）/ result（结论卡片）/ done（收尾），
+ * 异常统一走 error（文案说清原因与下一步）。
+ */
+@Slf4j
+@Service
+public class ChatService {
+
+    /** 建流超时：模型流式生成期间可能长时间无数据，取宽松值 */
+    private static final long SSE_TIMEOUT_MS = 180_000L;
+
+    /** 送入模型的历史消息条数上限（控制 token 与串话风险） */
+    private static final int HISTORY_LIMIT = 8;
+
+    private final ChatSessionMapper sessionMapper;
+    private final ChatMessageMapper messageMapper;
+    private final GuideService guideService;
+    private final RagService ragService;
+    private final AnswerParser answerParser;
+    private final SensitiveGuard sensitiveGuard;
+    private final SufficiencyRule sufficiencyRule;
+    private final DeptService deptService;
+    private final SysConfigService sysConfigService;
+    private final ObjectMapper objectMapper;
+    private final ThreadPoolTaskExecutor chatSseExecutor;
+
+    public ChatService(ChatSessionMapper sessionMapper, ChatMessageMapper messageMapper,
+                       GuideService guideService, RagService ragService,
+                       AnswerParser answerParser, SensitiveGuard sensitiveGuard,
+                       SufficiencyRule sufficiencyRule, DeptService deptService,
+                       SysConfigService sysConfigService, ObjectMapper objectMapper,
+                       @Qualifier(ChatExecutorConfig.CHAT_SSE_EXECUTOR) ThreadPoolTaskExecutor chatSseExecutor) {
+        this.sessionMapper = sessionMapper;
+        this.messageMapper = messageMapper;
+        this.guideService = guideService;
+        this.ragService = ragService;
+        this.answerParser = answerParser;
+        this.sensitiveGuard = sensitiveGuard;
+        this.sufficiencyRule = sufficiencyRule;
+        this.deptService = deptService;
+        this.sysConfigService = sysConfigService;
+        this.objectMapper = objectMapper;
+        this.chatSseExecutor = chatSseExecutor;
+    }
+
+    /** 建立 SSE 流：立即返回 emitter，编排在线程池中执行（与离线入库线程隔离） */
+    public SseEmitter stream(String userId, ChatDTO.MessageReq request) {
+        SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
+        emitter.onTimeout(emitter::complete);
+        chatSseExecutor.execute(() -> {
+            try {
+                handle(userId, request, emitter);
+            } catch (Exception e) {
+                log.error("导诊流处理异常", e);
+                safeComplete(emitter);
+            }
+        });
+        return emitter;
+    }
+
+    /** 挂号科室范围（患者端挂号页） */
+    public List<ChatDTO.DeptVO> listDepts() {
+        List<ChatDTO.DeptVO> result = new ArrayList<>();
+        for (Dept dept : deptService.listEnabled()) {
+            result.add(new ChatDTO.DeptVO(dept.getId(), dept.getName(), dept.getLocation(), dept.getIntro()));
+        }
+        return result;
+    }
+
+    /** 挂号确认（写入 actual_dept 与命中标记、会话置 closed） */
+    public ChatDTO.RegisterVO confirmRegister(String userId, ChatDTO.RegisterReq request) {
+        return guideService.confirmRegister(userId, request);
+    }
+
+    private void handle(String userId, ChatDTO.MessageReq request, SseEmitter emitter) {
+        String sessionId = null;
+        try {
+            String content = request.getContent() == null ? "" : request.getContent().trim();
+            ChatSession session = resolveSession(userId, request.getSessionId());
+            sessionId = session.getId();
+            handleTurn(userId, session, content, emitter);
+        } catch (BizException e) {
+            log.warn("导诊流业务异常：{}", e.getMessage());
+            emitError(emitter, sessionId, e.getMessage());
+        } catch (Exception e) {
+            log.error("导诊流异常", e);
+            emitError(emitter, sessionId, "系统繁忙，请稍后重试；您也可以重新描述一次症状。");
+        }
+        safeComplete(emitter);
+    }
+
+    /** 单轮编排主体：会话落定后执行（sessionId 已确定，异常由外层统一转 SSE error） */
+    private void handleTurn(String userId, ChatSession session, String content, SseEmitter emitter) {
+        {
+            String sessionId = session.getId();
+            send(emitter, SseEvents.SESSION, new SseEvents.SessionEvent(sessionId));
+
+            saveMessage(sessionId, MessageRole.USER, content);
+
+            // ① 敏感词入口前置校验（先于信息充足性判定）
+            SensitiveGuard.GuardResult guard = sensitiveGuard.check(userId, sessionId, content);
+            if (guard.action() == SensitiveGuard.GuardResult.Action.BLOCKED) {
+                saveMessage(sessionId, MessageRole.AI, guard.reply());
+                emitText(emitter, sessionId, guard.reply());
+                send(emitter, SseEvents.DONE, new SseEvents.DoneEvent(sessionId, false));
+                return;
+            }
+
+            // ② 规则硬门槛：首条主诉过于笼统 → 模板追问，不调模型
+            if (isFirstTurn(sessionId) && sufficiencyRule.tooVague(content)) {
+                String question = sufficiencyRule.templateQuestion();
+                saveMessage(sessionId, MessageRole.QUESTION, question);
+                ask(emitter, session, question);
+                return;
+            }
+
+            // ③ 检索（查询改写 → 双路召回 → RRF → 精排）
+            int askMaxRounds = sysConfigService.getInt(SysConfigService.KEY_ASK_MAX_ROUNDS, 3);
+            int askRound = session.getAskRound() == null ? 0 : session.getAskRound();
+            boolean forceConclusion = askRound >= askMaxRounds;
+            RagRequest ragRequest = new RagRequest(content, loadHistory(sessionId), deptOptions(),
+                    askRound, forceConclusion,
+                    sysConfigService.getInt(SysConfigService.KEY_RETRIEVE_TOP_K, RagRequest.DEFAULT_TOP_K),
+                    sysConfigService.getInt(SysConfigService.KEY_RETRIEVE_TOP_N, RagRequest.DEFAULT_TOP_N));
+            RagContext context = ragService.retrieve(ragRequest);
+
+            // ④ 流式生成：闸门分流——自然语言进气泡，结论 JSON 截留待解析
+            StreamGate gate = new StreamGate(AnswerParser.MARKER);
+            String rawOutput = ragService.streamAnswer(ragRequest, context, delta -> {
+                String visible = gate.accept(delta);
+                if (!visible.isEmpty()) {
+                    emitText(emitter, sessionId, visible);
+                }
+            });
+            String tail = gate.flush();
+            if (!tail.isEmpty()) {
+                emitText(emitter, sessionId, tail);
+            }
+
+            // ⑤ 解析与分流
+            RagAnswer answer = answerParser.parse(rawOutput);
+            if (answer.verdict() == RagAnswer.Verdict.ASK && !forceConclusion) {
+                saveMessage(sessionId, MessageRole.QUESTION, answer.reply());
+                ask(emitter, session, answer.reply());
+                return;
+            }
+
+            // ⑥ 结论：科室校验 + 导诊记录落库 + result/done
+            GuideService.Conclusion conclusion = guideService.saveConclusion(session, answer, context, rawOutput);
+            saveMessage(sessionId, MessageRole.AI, answer.reply());
+            send(emitter, SseEvents.RESULT, conclusion.payload());
+            send(emitter, SseEvents.DONE, new SseEvents.DoneEvent(sessionId, true));
+        }
+    }
+
+    /**
+     * 追问分支：轮次 +1 + question/done 事件（消息落库由调用方负责）。
+     * 注意追问文本在 ASK 轮已随 delta 流过——question 事件是「这条气泡属追问」的权威标记，
+     * 前端据此把流式气泡定性为追问，而不是再渲染一遍。
+     */
+    private void ask(SseEmitter emitter, ChatSession session, String question) {
+        int nextRound = (session.getAskRound() == null ? 0 : session.getAskRound()) + 1;
+        session.setAskRound(nextRound);
+        sessionMapper.updateById(session);
+        send(emitter, SseEvents.QUESTION, new SseEvents.QuestionEvent(session.getId(), question, nextRound));
+        send(emitter, SseEvents.DONE, new SseEvents.DoneEvent(session.getId(), false));
+    }
+
+    /**
+     * 会话状态机（新主诉判定双信号）：请求带的会话可续聊（ongoing 且未出结论）则续聊，
+     * 否则开新会话——判定是状态机字段，不做模型语义判断。
+     */
+    private ChatSession resolveSession(String userId, String sessionId) {
+        if (StringUtils.hasText(sessionId)) {
+            ChatSession existing = sessionMapper.selectById(sessionId);
+            if (existing != null && userId.equals(existing.getUserId()) && existing.continuable()) {
+                return existing;
+            }
+        }
+        ChatSession created = new ChatSession();
+        created.setUserId(userId);
+        created.setStatus(SessionStatus.ONGOING);
+        created.setAskRound(0);
+        created.setHasResult(0);
+        sessionMapper.insert(created);
+        return created;
+    }
+
+    private boolean isFirstTurn(String sessionId) {
+        return messageMapper.selectCount(Wrappers.<ChatMessage>lambdaQuery()
+                .eq(ChatMessage::getSessionId, sessionId)) <= 1;
+    }
+
+    /** 历史消息（不含刚落的当前用户消息），role：question/ai → assistant */
+    private List<RagTurn> loadHistory(String sessionId) {
+        List<ChatMessage> rows = messageMapper.selectList(Wrappers.<ChatMessage>lambdaQuery()
+                .eq(ChatMessage::getSessionId, sessionId)
+                .orderByAsc(ChatMessage::getCreatedAt)
+                .orderByAsc(ChatMessage::getId));
+        List<RagTurn> history = new ArrayList<>();
+        int end = Math.max(0, rows.size() - 1);
+        int from = Math.max(0, end - HISTORY_LIMIT);
+        for (ChatMessage row : rows.subList(from, end)) {
+            String role = row.getRole() == MessageRole.USER ? "user" : "assistant";
+            history.add(new RagTurn(role, row.getContent()));
+        }
+        return history;
+    }
+
+    private List<DeptOption> deptOptions() {
+        List<DeptOption> options = new ArrayList<>();
+        for (Dept dept : deptService.listEnabled()) {
+            options.add(new DeptOption(dept.getId(), dept.getName()));
+        }
+        return options;
+    }
+
+    private void saveMessage(String sessionId, MessageRole role, String content) {
+        ChatMessage message = new ChatMessage();
+        message.setSessionId(sessionId);
+        message.setRole(role);
+        message.setContent(content == null ? "" : content);
+        messageMapper.insert(message);
+    }
+
+    private void emitText(SseEmitter emitter, String sessionId, String text) {
+        send(emitter, SseEvents.DELTA, new SseEvents.DeltaEvent(sessionId, text));
+    }
+
+    /** 错误事件推送：本身就是兜底路径，推送失败只记日志不抛 */
+    private void emitError(SseEmitter emitter, String sessionId, String message) {
+        try {
+            send(emitter, SseEvents.ERROR, new SseEvents.ErrorEvent(sessionId, message));
+            send(emitter, SseEvents.DONE, new SseEvents.DoneEvent(sessionId, false));
+        } catch (Exception e) {
+            log.debug("错误事件推送失败（客户端可能已断开）：{}", e.getMessage());
+        }
+    }
+
+    private void send(SseEmitter emitter, String event, Object payload) {
+        try {
+            emitter.send(SseEmitter.event()
+                    .name(event)
+                    .data(objectMapper.writeValueAsString(payload), MediaType.APPLICATION_JSON));
+        } catch (IOException e) {
+            // 客户端断开：终止本轮流，不再继续生成与落库
+            throw new BizException(ErrorCode.INTERNAL_ERROR, "连接已断开");
+        } catch (IllegalStateException e) {
+            log.debug("SSE 已完成，跳过事件 {}：{}", event, e.getMessage());
+        }
+    }
+
+    private void safeComplete(SseEmitter emitter) {
+        try {
+            emitter.complete();
+        } catch (Exception ignored) {
+            // 客户端已断开或已结束，忽略
+        }
+    }
+}
