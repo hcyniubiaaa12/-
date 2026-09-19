@@ -69,9 +69,11 @@ public class SecurityConfig {
         return source;
     }
 
-    /** 统一返回体 JSON（401/403） */
+    /** 统一返回体 JSON：未登录 401（前端跳登录）、无权限 403 */
     private void writeResult(HttpServletResponse response, ErrorCode errorCode) throws java.io.IOException {
-        response.setStatus(HttpServletResponse.SC_UNAUTHORIZED);
+        response.setStatus(errorCode == ErrorCode.FORBIDDEN
+                ? HttpServletResponse.SC_FORBIDDEN
+                : HttpServletResponse.SC_UNAUTHORIZED);
         response.setContentType(MediaType.APPLICATION_JSON_VALUE);
         response.setCharacterEncoding(StandardCharsets.UTF_8.name());
         response.getWriter().write(objectMapper.writeValueAsString(Result.fail(errorCode)));
