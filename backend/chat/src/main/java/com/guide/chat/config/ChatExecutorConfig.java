@@ -9,7 +9,9 @@ import java.util.concurrent.ThreadPoolExecutor;
 /**
  * 在线导诊线程池：SSE 流式编排（含模型流式等待）用，与离线入库线程池隔离，不共用
  * （见 CLAUDE.md 依赖规范：async 线程池与在线导诊线程隔离）。
- * 队列满时用 CallerRunsPolicy 退化为调用线程执行——宁可拖慢一次请求，也不丢患者消息。
+ * 队列满时 AbortPolicy 直接拒绝：CallerRunsPolicy 会让 Tomcat 请求线程同步跑完整个模型生成，
+ * 此时 emitter 还没交给 MVC，delta 只能攒在缓冲区里一次性回放，逐字流式渲染整体失效；
+ * 拒绝后由 ChatService 明确回一个 error 事件，患者可重试。
  */
 @Configuration
 public class ChatExecutorConfig {
@@ -23,7 +25,7 @@ public class ChatExecutorConfig {
         executor.setMaxPoolSize(16);
         executor.setQueueCapacity(50);
         executor.setThreadNamePrefix("chat-sse-");
-        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.CallerRunsPolicy());
+        executor.setRejectedExecutionHandler(new ThreadPoolExecutor.AbortPolicy());
         executor.initialize();
         return executor;
     }

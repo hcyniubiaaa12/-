@@ -35,6 +35,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.RejectedExecutionException;
 
 /**
  * 问诊对话编排（链路 A 主链路）。
@@ -89,14 +90,22 @@ public class ChatService {
     public SseEmitter stream(String userId, ChatDTO.MessageReq request) {
         SseEmitter emitter = new SseEmitter(SSE_TIMEOUT_MS);
         emitter.onTimeout(emitter::complete);
-        chatSseExecutor.execute(() -> {
-            try {
-                handle(userId, request, emitter);
-            } catch (Exception e) {
-                log.error("导诊流处理异常", e);
-                safeComplete(emitter);
-            }
-        });
+        try {
+            chatSseExecutor.execute(() -> {
+                try {
+                    handle(userId, request, emitter);
+                } catch (Exception e) {
+                    log.error("导诊流处理异常", e);
+                    safeComplete(emitter);
+                }
+            });
+        } catch (RejectedExecutionException e) {
+            // 线程池已满（AbortPolicy）：宁可明确报错，也不在 Tomcat 线程里同步跑完模型生成
+            // （那样 emitter 尚未交给 MVC，流式渲染会整体失效）
+            log.warn("导诊线程池已满，拒绝本轮请求：{}", e.getMessage());
+            emitError(emitter, null, "当前问诊人数较多，请稍后再试。");
+            safeComplete(emitter);
+        }
         return emitter;
     }
 
@@ -123,7 +132,7 @@ public class ChatService {
             handleTurn(userId, session, content, emitter);
         } catch (BizException e) {
             log.warn("导诊流业务异常：{}", e.getMessage());
-            emitError(emitter, sessionId, e.getMessage());
+            emitError(emitter, sessionId, patientMessage(e));
         } catch (Exception e) {
             log.error("导诊流异常", e);
             emitError(emitter, sessionId, "系统繁忙，请稍后重试；您也可以重新描述一次症状。");
@@ -149,7 +158,7 @@ public class ChatService {
             }
 
             // ② 规则硬门槛：首条主诉过于笼统 → 模板追问，不调模型
-            if (isFirstTurn(sessionId) && sufficiencyRule.tooVague(content)) {
+            if (isFirstTurn(session) && sufficiencyRule.tooVague(content)) {
                 String question = sufficiencyRule.templateQuestion();
                 saveMessage(sessionId, MessageRole.QUESTION, question);
                 ask(emitter, session, question);
@@ -181,6 +190,10 @@ public class ChatService {
 
             // ⑤ 解析与分流
             RagAnswer answer = answerParser.parse(rawOutput);
+            if (answer.verdict() == RagAnswer.Verdict.RECOMMEND && !rawOutput.contains(AnswerParser.MARKER)) {
+                // 模型漏输出结论分隔符：JSON 已随 delta 流进气泡，这里只留痕，便于后续调 Prompt
+                log.warn("模型未输出结论分隔符，按 JSON 兜底解析：sessionId={}", sessionId);
+            }
             if (answer.verdict() == RagAnswer.Verdict.ASK && !forceConclusion) {
                 saveMessage(sessionId, MessageRole.QUESTION, answer.reply());
                 ask(emitter, session, answer.reply());
@@ -228,9 +241,13 @@ public class ChatService {
         return created;
     }
 
-    private boolean isFirstTurn(String sessionId) {
-        return messageMapper.selectCount(Wrappers.<ChatMessage>lambdaQuery()
-                .eq(ChatMessage::getSessionId, sessionId)) <= 1;
+    /**
+     * 是否仍是本会话的首条主诉：用状态机信号判定（尚未追问、尚未出结论），
+     * 不用消息条数——被敏感词拦截的消息也会落库，按条数判定会让规则门槛在拦截后失效。
+     */
+    private boolean isFirstTurn(ChatSession session) {
+        int askRound = session.getAskRound() == null ? 0 : session.getAskRound();
+        return askRound == 0 && (session.getHasResult() == null || session.getHasResult() == 0);
     }
 
     /** 历史消息（不含刚落的当前用户消息），role：question/ai → assistant */
@@ -267,6 +284,19 @@ public class ChatService {
 
     private void emitText(SseEmitter emitter, String sessionId, String text) {
         send(emitter, SseEvents.DELTA, new SseEvents.DeltaEvent(sessionId, text));
+    }
+
+    /**
+     * 异常 → 患者可见文案：业务异常（如知识库无可用科室）原样透出，
+     * 模型/系统类异常换成面向患者的说法——异常原文里有上游响应体、配置项名甚至 Key 片段，
+     * 只能进日志，不能进患者气泡。
+     */
+    private String patientMessage(BizException e) {
+        return switch (e.getCode()) {
+            case 4000 -> e.getMessage();                       // RAG_EMPTY：知识库暂无相关内容
+            case 3001 -> e.getMessage();                       // SENSITIVE_BLOCKED 等业务提示
+            default -> "服务暂时不可用，请稍后重试；您也可以重新描述一次症状。";
+        };
     }
 
     /** 错误事件推送：本身就是兜底路径，推送失败只记日志不抛 */

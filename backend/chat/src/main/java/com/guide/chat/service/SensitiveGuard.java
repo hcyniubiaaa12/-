@@ -57,8 +57,9 @@ public class SensitiveGuard {
                 }
                 continue;
             }
-            if (medicalTermService.matches(word.getWord())) {
-                // 白名单优先：该词本身是医学术语（部位/症状），防误杀放行
+            if (medicalTermService.isTerm(word.getWord())) {
+                // 白名单优先：该词本身是医学术语（部位/症状），防误杀放行。
+                // 精确匹配，不能用子串——白名单含「心/头/手」等单字，子串判定会让「黑心医院」漏拦
                 continue;
             }
             recordHit(userId, sessionId, word, SensitiveHitEvent.BLOCKED);

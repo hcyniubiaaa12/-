@@ -35,8 +35,8 @@ public class ChatDTO {
     public record DeptVO(String id, String name, String location, String intro) {
     }
 
-    /** 推荐卡 Top3 置信度条 */
-    public record Top3Item(String name, int pct) {
+    /** 推荐卡 Top3 置信度条；pct 为 null 表示模型未给出合法置信度（前端显示「—」） */
+    public record Top3Item(String name, Integer pct) {
     }
 
     /** 结论溯源引用（注号对应证据快照 retrieved 顺序） */

@@ -205,8 +205,9 @@ public class GuideService {
                 cites, lowConfidence);
     }
 
-    private int percent(Double confidence) {
-        return confidence == null ? 0 : (int) Math.round(confidence * 100);
+    /** 置信度 → 百分比；null（模型未给合法值/兜底科室）保持 null，前端显示「—」而不是 0% */
+    private Integer percent(Double confidence) {
+        return confidence == null ? null : (int) Math.round(confidence * 100);
     }
 
     private boolean top3Contains(String recTop3, String deptId) {
