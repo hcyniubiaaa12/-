@@ -31,6 +31,7 @@
           <div class="a-topbar__ops">
             <button class="a-btn a-btn--ghost">近 7 天</button>
             <span class="a-topbar__user">{{ user.nickname || '管理员' }}</span>
+            <button class="a-btn a-btn--ghost" @click="onLogout">退出登录</button>
           </div>
         </header>
 
@@ -43,12 +44,25 @@
 </template>
 
 <script setup>
-import { useRoute } from 'vue-router'
+import { useRoute, useRouter } from 'vue-router'
 import { useUserStore } from '../../stores/user'
+import { logout as apiLogout } from '../../api/auth'
 import '../../styles/admin.css'
 
 const route = useRoute()
+const router = useRouter()
 const user = useUserStore()
+
+// 退出登录：先调后端删 Redis 登录态（登出即时失效），再清本地态跳登录页；
+// 接口失败也照常清本地态，避免卡死在控制台
+async function onLogout() {
+  try {
+    await apiLogout()
+  } finally {
+    user.logout()
+    router.push('/login')
+  }
+}
 
 // 待办徽标由审核队列实时数据驱动（当前为模板假数据）
 const navs = [

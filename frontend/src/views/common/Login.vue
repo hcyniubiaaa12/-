@@ -21,11 +21,28 @@
         />
       </div>
 
+      <div v-if="mode === 'register'" class="p-login__field">
+        <label class="p-eyebrow" for="n">昵 称（选填）</label>
+        <input
+          id="n"
+          v-model="form.nickname"
+          class="p-login__input"
+          placeholder="怎么称呼您"
+          @keydown.enter="submit"
+        />
+      </div>
+
       <p v-if="error" class="p-login__err">{{ error }}</p>
 
-      <button class="p-btn" style="margin-top: 18px" @click="submit">登 录</button>
+      <button class="p-btn" style="margin-top: 18px" :disabled="loading" @click="submit">
+        {{ loading ? '请稍候…' : mode === 'login' ? '登 录' : '注 册' }}
+      </button>
 
-      <p class="p-login__tip">演示：admin / 123456 进管理端，其他用户名进患者端</p>
+      <p class="p-login__switch" @click="switchMode">
+        {{ mode === 'login' ? '还没有账号？注册一个（患者身份）' : '已有账号？返回登录' }}
+      </p>
+
+      <p class="p-login__tip">演示：admin / 123456 进管理端，患者账号可注册后登录</p>
     </div>
   </div>
 </template>
@@ -34,28 +51,55 @@
 import { ref } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useUserStore } from '../../stores/user'
+import { login, register } from '../../api/auth'
 import '../../styles/patient.css'
 
 const router = useRouter()
 const route = useRoute()
 const user = useUserStore()
 
-const form = ref({ username: '', password: '' })
+const mode = ref('login') // login / register（注册默认患者角色，链路 D）
+const loading = ref(false)
+const form = ref({ username: '', password: '', nickname: '' })
 const error = ref('')
 
-// 假数据登录：真实实现 POST /api/auth/login → { token, role, nickname }
-function submit() {
+function switchMode() {
+  mode.value = mode.value === 'login' ? 'register' : 'login'
+  error.value = ''
+}
+
+async function submit() {
   if (!form.value.username || !form.value.password) {
     error.value = '请填写用户名与密码'
     return
   }
-  const isAdmin = form.value.username === 'admin'
-  user.setLogin({
-    token: 'mock-token',
-    role: isAdmin ? 'admin' : 'patient',
-    nickname: isAdmin ? '系统管理员' : form.value.username
-  })
-  router.push(route.query.redirect || (isAdmin ? '/admin/dashboard' : '/'))
+  if (mode.value === 'register' && form.value.username.length < 3) {
+    error.value = '用户名长度需在 3-32 位之间'
+    return
+  }
+  if (mode.value === 'register' && form.value.password.length < 6) {
+    error.value = '密码长度需在 6-64 位之间'
+    return
+  }
+  loading.value = true
+  error.value = ''
+  try {
+    // 登录/注册均返回 LoginVO；注册成功即登录（后端直接签发 token）
+    const vo = mode.value === 'login'
+      ? await login({ username: form.value.username, password: form.value.password })
+      : await register({
+          username: form.value.username,
+          password: form.value.password,
+          nickname: form.value.nickname || undefined
+        })
+    user.setLogin(vo)
+    router.push(route.query.redirect || (vo.role === 'admin' ? '/admin/dashboard' : '/'))
+  } catch (e) {
+    // 后端校验 message（用户名已存在 / 封禁 / 密码错误等）直接展示
+    error.value = e.message || '登录失败，请稍后重试'
+  } finally {
+    loading.value = false
+  }
 }
 </script>
 
@@ -101,6 +145,14 @@ function submit() {
 }
 .p-login__input:focus { outline: none; border-color: var(--teal); }
 .p-login__err { font-size: 12.5px; color: var(--err); }
+.p-login__switch {
+  margin-top: 12px;
+  text-align: center;
+  font-size: 12.5px;
+  color: var(--teal);
+  cursor: pointer;
+}
+.p-login__switch:hover { text-decoration: underline; }
 .p-login__tip {
   margin-top: 14px;
   text-align: center;
