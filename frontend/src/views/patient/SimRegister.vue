@@ -32,11 +32,13 @@
           缺少导诊记录，请先在对话页完成一次分诊再来挂号。
           <button class="p-error__retry" @click="backToChat">返回对话页</button>
         </div>
+        <!-- 失败提示必须给出下一步：列表加载失败可重试，提交失败（已挂过号/科室停用/网络）回对话页 -->
         <div v-else-if="error" class="p-error p-reg__tip">
           {{ error.message }}
           <button v-if="error.action === 'reload'" class="p-error__retry" @click="loadDepts">
             重新加载
           </button>
+          <button v-else class="p-error__retry" @click="backToChat">返回对话页</button>
         </div>
 
         <div class="p-eyebrow" style="margin-bottom: 10px">科 室 列 表 · 全 部 启 用</div>

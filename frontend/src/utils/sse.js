@@ -4,6 +4,7 @@
 // 每条的 data 均为 JSON；error 之后后端还会补一个 done，前端以 error 收尾即可。
 import router from '../router'
 import { useUserStore } from '../stores/user'
+import { useChatStore } from '../stores/chat'
 
 // SSE 事件名 → handlers 回调名
 const HANDLER = {
@@ -16,7 +17,9 @@ const HANDLER = {
 }
 
 // 与 src/api/http.js 的 redirectToLogin 行为一致：清登录态并跳登录页
+// 同时清空对话 store——共用设备上换账号登录后，不能看到上一位患者的主诉与结论卡
 function redirectToLogin() {
+  useChatStore().reset()
   useUserStore().logout()
   if (router.currentRoute.value.path !== '/login') {
     router.push({ path: '/login', query: { redirect: router.currentRoute.value.fullPath } })
@@ -52,8 +55,12 @@ async function readFailure(res) {
  * @returns {Promise<void>} 流结束（或异常已回落 onError）后 resolve
  */
 export async function streamChat({ sessionId, content }, handlers = {}, signal) {
+  // 是否已经收到终态（done / error / 本地失败）：收流时没有终态 = 连接被中断
+  let settled = false
   // onError 是唯一出口：回调自身抛错也不能把异常抛出本函数（调用方是 fire-and-forget）
   const fail = (message) => {
+    if (settled) return
+    settled = true
     try {
       handlers.onError?.({ message })
     } catch (e) {
@@ -68,7 +75,9 @@ export async function streamChat({ sessionId, content }, handlers = {}, signal) 
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        Accept: 'text/event-stream',
+        // 同时接受 JSON：接口 produces 是 text/event-stream，参数校验失败等错误路径返回的是
+        // Result JSON——只声明 text/event-stream 会让 Spring 协商失败（406 空体），错误文案丢失
+        Accept: 'text/event-stream, application/json',
         ...(token ? { Authorization: `Bearer ${token}` } : {})
       },
       body: JSON.stringify({ sessionId: sessionId || undefined, content }),
@@ -83,6 +92,15 @@ export async function streamChat({ sessionId, content }, handlers = {}, signal) 
   if (!res.ok) {
     const { code, message } = await readFailure(res)
     // 401 与业务码 2000 = 未登录/登录已过期，与 http.js 一致
+    if (res.status === 401 || code === 2000) redirectToLogin()
+    fail(message)
+    return
+  }
+  // 后端全局异常处理会把业务异常/参数校验失败包成 HTTP 200 + Result JSON：
+  // 那种响应不是事件流，必须按 Result 解析并报错，否则错误会被当成空流静默吞掉
+  const contentType = res.headers.get('content-type') || ''
+  if (!contentType.includes('text/event-stream')) {
+    const { code, message } = await readFailure(res)
     if (res.status === 401 || code === 2000) redirectToLogin()
     fail(message)
     return
@@ -106,6 +124,7 @@ export async function streamChat({ sessionId, content }, handlers = {}, signal) 
     dataLines = []
     const handler = name ? handlers[HANDLER[name]] : null
     if (!handler || !raw) return
+    if (name === 'done' || name === 'error') settled = true
     let payload
     try {
       payload = JSON.parse(raw)
@@ -160,6 +179,9 @@ export async function streamChat({ sessionId, content }, handlers = {}, signal) 
       buffer = ''
       dispatch()
     }
+    // 流结束但没收到任何终态事件（服务端超时/被中断）：必须报错，
+    // 否则页面留下一个空白气泡，患者既看不到原因也没有重试入口
+    if (!settled) fail('连接中断，请重新发送')
   } catch (e) {
     if (e?.name === 'AbortError') return
     fail('连接中断，请重新发送')

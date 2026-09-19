@@ -51,8 +51,8 @@
               :class="{ 'p-bar--top': k === 0 }"
             >
               <span class="p-bar__name">{{ c.name }}</span>
-              <span class="p-bar__track"><span class="p-bar__fill" :style="{ width: c.pct + '%' }" /></span>
-              <span class="p-bar__pct">{{ c.pct }}%</span>
+              <span class="p-bar__track"><span class="p-bar__fill" :style="{ width: (c.pct ?? 0) + '%' }" /></span>
+              <span class="p-bar__pct">{{ c.pct == null ? '—' : c.pct + '%' }}</span>
             </div>
           </div>
 
@@ -145,8 +145,10 @@ function confText(confidence) {
     : '—'
 }
 
+// 低置信度以**后端下发为准**（阈值来自 sys_config，管理端可调）；
+// 前端只在后端没给标志时按「置信度缺失」兜底，不自己写死阈值，避免与管理端口径打架
 function isLow(card) {
-  return card.lowConfidence === true || typeof card.confidence !== 'number' || card.confidence < 0.5
+  return card.lowConfidence === true || typeof card.confidence !== 'number'
 }
 
 let scrollScheduled = false

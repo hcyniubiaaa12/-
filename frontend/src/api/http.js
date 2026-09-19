@@ -1,6 +1,7 @@
 import axios from 'axios'
 import router from '../router'
 import { useUserStore } from '../stores/user'
+import { useChatStore } from '../stores/chat'
 
 // HTTP 统一封装：拦截器带 JWT、401 跳登录
 // 约定：resolve 直接给 Result.data（业务数据本体）；业务错误（HTTP 200 但 code!==200）
@@ -18,6 +19,8 @@ http.interceptors.request.use((config) => {
 
 function redirectToLogin() {
   // 清 store（token/role/nickname 同步清 localStorage），避免守卫仍判定已登录
+  // 连同对话 store 一起清：共用设备上换账号后不能看到上一位患者的主诉与结论卡
+  useChatStore().reset()
   useUserStore().logout()
   if (router.currentRoute.value.path !== '/login') {
     router.push({ path: '/login', query: { redirect: router.currentRoute.value.fullPath } })
