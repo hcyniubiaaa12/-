@@ -21,6 +21,6 @@ public class SensitiveWord extends BaseEntity {
 
     private Integer hitCount;
 
-    /** 0 启用 / 1 停用（含义按管理端约定） */
+    /** 1 启用 / 0 停用（与 mysql_init.sql 注释一致；停用词不参与入口校验） */
     private Integer enabled;
 }

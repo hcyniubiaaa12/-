@@ -20,4 +20,9 @@ public class BizException extends RuntimeException {
         super(errorCode.getMessage() + ": " + detail);
         this.code = errorCode.getCode();
     }
+
+    public BizException(int code, String message) {
+        super(message);
+        this.code = code;
+    }
 }

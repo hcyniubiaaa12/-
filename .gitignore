@@ -1,11 +1,15 @@
 # 毕业设计过程文件（docx 解包/校验产物，不入库）
 毕业文件/
 
-# 构建产物
+# AI 工作记忆目录（本地数据，不入库）
+.workbuddy/
+
+# 构建产物与运行日志
 node_modules/
 dist/
 target/
 *.class
+logs/
 
 # IDE
 .idea/

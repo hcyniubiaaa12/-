@@ -19,6 +19,16 @@
             <groupId>com.guide</groupId>
             <artifactId>common</artifactId>
         </dependency>
+        <!-- 入库流水线向量化：kb 是唯一写向量库入口，embedding 经 LLM 适配层（不直连第三方 API） -->
+        <dependency>
+            <groupId>com.guide</groupId>
+            <artifactId>llm</artifactId>
+        </dependency>
+        <!-- 实现 rag 的 ChunkTextProvider 端口（依赖倒置：rag 不反向依赖 kb） -->
+        <dependency>
+            <groupId>com.guide</groupId>
+            <artifactId>rag</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-web</artifactId>

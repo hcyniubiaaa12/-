@@ -32,6 +32,20 @@
             <artifactId>minio</artifactId>
             <version>8.5.10</version>
         </dependency>
+        <!-- 向量库（PostgreSQL + pgvector）客户端：kb 写 / rag 读 / feedback 写锚点 -->
+        <dependency>
+            <groupId>org.postgresql</groupId>
+            <artifactId>postgresql</artifactId>
+        </dependency>
+        <!-- Elasticsearch 官方 Java API Client：chunk 全文检索（BM25）+ 术语聚合 -->
+        <dependency>
+            <groupId>co.elastic.clients</groupId>
+            <artifactId>elasticsearch-java</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.elasticsearch.client</groupId>
+            <artifactId>elasticsearch-rest-client</artifactId>
+        </dependency>
         <dependency>
             <groupId>org.projectlombok</groupId>
             <artifactId>lombok</artifactId>

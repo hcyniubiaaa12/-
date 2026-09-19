@@ -1,20 +1,23 @@
 /* ============================================================
    管理端「冷靛控制台」方案 B —— 令牌与部件
-   见 .claude/rules/前端设计方案.md 管理端章节；参考稿 管理B-冷靛控制台.html
+   见 .claude/rules/前端设计方案.md 管理端章节；参考稿 管理端方案/管理B3-冷靛控制台.html
    作用域：全部规则挂在 .admin-root 下，与患者端样式互不干扰
    ============================================================ */
 
 .admin-root {
-  /* 色板（只用这些值） */
+  /* 色板（只用这些值；B3 修订：主色向靛收敛 + 语义浅底，见前端设计方案.md） */
   --bg: #F2F5FA;
   --card: #FFFFFF;
   --ink: #1B2740;
   --ink-2: #66718C;
   --line: #D9E0EE;
-  --blue: #3B82C4;
-  --blue-deep: #2A6399;
+  --blue: #4468B8;
+  --blue-deep: #33518F;
+  --blue-side: #3D5CA4;
   --coral: #E06B4D;
-  --wash: #EAF0F9;
+  --wash: #EDF1F9;
+  --coral-soft: #FBEAE5;
+  --moss-soft: #E8F2EC;
   --moss: #4A7C59;
   --err: #A94438;
 
@@ -29,6 +32,14 @@
   -webkit-font-smoothing: antialiased;
 }
 .admin-root *:focus-visible { outline: 2px solid var(--blue); outline-offset: 2px; }
+/* EP 输入框/下拉自带 wrapper 边框即焦点指示，内部原生 input 不再叠加 outline（避免双框） */
+.admin-root .el-input__wrapper:focus-visible,
+.admin-root .el-input__inner:focus-visible,
+.admin-root .el-textarea__inner:focus-visible,
+.admin-root .el-select__wrapper:focus-visible,
+.admin-root .el-select__input:focus-visible,
+.admin-root .el-pagination button:focus-visible,
+.admin-root .el-pager li:focus-visible { outline: none; }
 
 /* ---------- 布局：212px 侧栏 + 主区 ---------- */
 .a-shell { display: flex; min-height: 100vh; }
@@ -36,7 +47,7 @@
 .a-side {
   flex: none;
   width: 212px;
-  background: var(--blue);
+  background: var(--blue-side);
   color: #fff;
   display: flex;
   flex-direction: column;
@@ -78,6 +89,84 @@
   padding: 3px 7px;
   border-radius: 10px; /* 药丸形 */
 }
+
+/* ---------- 侧栏折叠态 ---------- */
+.a-side {
+  transition: width .18s ease;
+}
+.a-side--collapsed { width: 60px; }
+.a-side--collapsed .a-side__brand {
+  padding: 18px 10px 16px;
+  font-size: 0; /* 折叠时隐藏文字，只留折叠按钮 */
+}
+.a-side--collapsed .a-side__brand small { display: none; }
+.a-side--collapsed .a-nav__item { justify-content: center; padding: 10px 0; }
+.a-nav__abbr { font-size: 12px; }
+.a-side__toggle {
+  position: absolute;
+  right: -13px;
+  top: 22px;
+  width: 26px;
+  height: 26px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  background: var(--card);
+  color: var(--ink-2);
+  cursor: pointer;
+  font-size: 12px;
+  transition: all .18s ease;
+  z-index: 5;
+}
+.a-side__toggle:hover { color: var(--blue); border-color: var(--blue); }
+.a-side__brand { position: relative; }
+
+/* ---------- 侧栏用户区（管理员 + 退出下拉） ---------- */
+.a-side__user {
+  padding: 12px 14px;
+  border-top: 1px solid rgba(255, 255, 255, .18);
+}
+.a-side--collapsed .a-side__user { padding: 12px 8px; }
+.a-side__user-btn {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: #fff;
+  font-family: var(--sans);
+  cursor: pointer;
+  transition: background .18s ease;
+}
+.a-side__user-btn:hover { background: rgba(255, 255, 255, .12); }
+.a-side__avatar {
+  flex: none;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .2);
+  font-size: 13px;
+  font-weight: 600;
+}
+.a-side__user-name {
+  flex: 1;
+  text-align: left;
+  font-size: 12.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.a-side__caret { font-size: 12px; opacity: .72; }
+/* 折叠态：下拉对齐按钮而非撑满侧栏 */
+.a-side--collapsed .a-side__user-btn { justify-content: center; padding: 6px 0; }
 
 /* ---------- 主区 ---------- */
 .a-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
@@ -125,6 +214,56 @@
 .a-btn--ghost:hover { background: var(--wash); border-color: var(--blue); color: var(--blue); }
 .a-btn--danger { background: transparent; color: var(--err); padding: 7px 4px; }
 .a-btn--danger:hover { background: transparent; text-decoration: underline; }
+
+/* ---------- 行内输入与面板（用户管理页搜索/词库表单） ---------- */
+.a-input {
+  min-height: 32px;
+  padding: 6px 10px;
+  border: 1px solid var(--line);
+  border-radius: 0;
+  background: var(--card);
+  font-family: var(--sans);
+  font-size: 12.5px;
+  color: var(--ink);
+}
+.a-input:focus { outline: none; border-color: var(--blue); }
+.a-input::placeholder { color: var(--ink-2); }
+textarea.a-input { resize: vertical; line-height: 1.6; }
+
+.a-inline-panel {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 12px;
+  margin-bottom: 12px;
+  background: var(--wash);
+  border: 1px solid var(--line);
+}
+
+/* ---------- 分页器 ---------- */
+.a-pager {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 12px;
+  font-family: var(--sans);
+  font-size: 12px;
+  color: var(--ink-2);
+}
+.a-pager__btn {
+  min-width: 28px;
+  height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--ink-2);
+  font-family: var(--sans);
+  font-size: 12px;
+  cursor: pointer;
+}
+.a-pager__btn:disabled { opacity: .45; cursor: not-allowed; }
+.a-pager__btn:not(:disabled):hover { border-color: var(--blue); color: var(--blue); }
 .a-btn:disabled { opacity: .45; cursor: not-allowed; pointer-events: none; }
 
 /* ---------- KPI 指标卡 ---------- */
@@ -202,14 +341,14 @@
   font-weight: 400;
   color: var(--ink-2);
   text-align: left;
-  background: #FAFBFE;
+  background: var(--wash);
   padding: 8px 10px;
   border-bottom: 1px solid var(--line);
 }
 .a-table td { padding: 9px 10px; border-bottom: 1px solid var(--line); font-size: 12.5px; }
 .a-table tbody tr:hover { background: var(--wash); }
 .a-table__ops { display: flex; gap: 10px; align-items: center; }
-.a-subrow td { background: #FAFBFE; }
+.a-subrow td { background: var(--wash); }
 
 /* ---------- 状态 tag（药丸形） ---------- */
 .a-tag {

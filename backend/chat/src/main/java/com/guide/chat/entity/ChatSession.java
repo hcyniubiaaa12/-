@@ -22,4 +22,12 @@ public class ChatSession extends BaseEntity {
 
     /** 追问轮次 0–3 */
     private Integer askRound;
+
+    /** 0/1 已出导诊结论（新主诉判定双信号之一：has_result=1 或 status=closed） */
+    private Integer hasResult;
+
+    /** 是否可续聊（未出结论且未关闭）；否则下一条输入开新会话 */
+    public boolean continuable() {
+        return status == SessionStatus.ONGOING && (hasResult == null || hasResult == 0);
+    }
 }

@@ -4,13 +4,13 @@
     <div v-for="k in kpis" :key="k.label" class="a-kpi">
       <div class="a-kpi__ring" :class="{ 'a-kpi__ring--warn': k.warn }">
         <svg width="56" height="56" viewBox="0 0 56 56">
-          <circle cx="28" cy="28" r="24" fill="none" stroke="#EAF0F9" stroke-width="5" />
+          <circle cx="28" cy="28" r="24" fill="none" stroke="#EDF1F9" stroke-width="5" />
           <circle
             cx="28"
             cy="28"
             r="24"
             fill="none"
-            :stroke="k.warn ? '#E06B4D' : '#3B82C4'"
+            :stroke="k.warn ? '#E06B4D' : '#4468B8'"
             stroke-width="5"
             stroke-linecap="round"
             :stroke-dasharray="`${(k.pct * 150.8).toFixed(1)} 150.8`"
@@ -33,7 +33,7 @@
       <div class="a-panel__head">
         <span class="a-panel__title">每日导诊量 · 命中构成</span>
         <span class="a-legend">
-          <span><i class="a-legend__dot" style="background: #3B82C4" />命中</span>
+          <span><i class="a-legend__dot" style="background: #4468B8" />命中</span>
           <span><i class="a-legend__dot" style="background: #E06B4D" />未命中</span>
         </span>
       </div>
