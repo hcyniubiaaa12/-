@@ -2,7 +2,7 @@ package com.guide.common.api;
 
 /**
  * 错误码枚举：code 统一按模块分段。
- * common 1xxx / auth 2xxx / chat 3xxx / rag 4xxx / kb 5xxx / feedback 6xxx。
+ * common 1xxx / auth 2xxx / chat 3xxx / rag 4xxx / kb 5xxx / feedback 6xxx / llm 7xxx。
  */
 public enum ErrorCode {
 
@@ -29,9 +29,16 @@ public enum ErrorCode {
 
     // kb 5xxx
     DOC_NOT_FOUND(5000, "文档不存在"),
+    DEPT_NOT_FOUND(5001, "科室不存在"),
+    DEPT_DISABLED(5002, "科室已停用，暂不可挂号"),
 
     // feedback 6xxx
-    RECORD_NOT_FOUND(6000, "导诊记录不存在");
+    RECORD_NOT_FOUND(6000, "导诊记录不存在"),
+    RECORD_ALREADY_REGISTERED(6001, "该导诊记录已完成挂号"),
+
+    // llm 7xxx（LLM 适配层：DeepSeek 对话 / 阿里 embedding / 阿里 rerank）
+    LLM_NOT_CONFIGURED(7000, "模型服务未配置，请在 application-local.yml 填写 API Key"),
+    LLM_CALL_FAILED(7001, "模型调用失败，请稍后重试");
 
     private final int code;
     private final String message;
