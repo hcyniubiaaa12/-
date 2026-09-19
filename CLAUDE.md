@@ -25,8 +25,8 @@ frontend/
 ```
 backend/
 ├── common/     # 公共件：统一返回体、异常、工具类、常量；被所有模块依赖，不依赖任何业务模块
-├── auth/       # 链路 D：Security + JWT 签发/校验、登录注册、角色权限、用户封禁状态校验
-├── chat/       # 链路 A：问诊对话编排、SSE 四态事件流、会话/消息落库、信息充足性判定与追问、敏感词入口前置校验
+├── auth/       # 链路 D：Security + JWT 签发/校验、登录注册、角色权限、用户封禁状态校验；sys_config 运行时参数
+├── chat/       # 链路 A：问诊对话编排、SSE 事件流（delta/question/result/done/error + session）、会话/消息落库、信息充足性判定与追问、敏感词入口前置校验
 ├── rag/        # RAG 检索层：查询改写→召回→重排→Prompt→解析
 ├── llm/        # LLM 适配层：DeepSeek 对话 / 阿里 embedding / 阿里 rerank；唯一外部模型出口
 ├── kb/         # 链路 B：知识库管理、科室/文档/映射维护；唯一写向量库入口
