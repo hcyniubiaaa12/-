@@ -25,6 +25,7 @@ import com.guide.rag.dto.RagRequest;
 import com.guide.rag.dto.RagTurn;
 import com.guide.rag.support.AnswerParser;
 import lombok.extern.slf4j.Slf4j;
+import org.slf4j.MDC;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.http.MediaType;
 import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
@@ -54,6 +55,9 @@ public class ChatService {
 
     /** 送入模型的历史消息条数上限（控制 token 与串话风险） */
     private static final int HISTORY_LIMIT = 8;
+
+    /** MDC 键：轮次标记（日志按一次导诊归组用，见 turnTag） */
+    private static final String TURN_KEY = "turn";
 
     private final ChatSessionMapper sessionMapper;
     private final ChatMessageMapper messageMapper;
@@ -125,10 +129,16 @@ public class ChatService {
 
     private void handle(String userId, ChatDTO.MessageReq request, SseEmitter emitter) {
         String sessionId = null;
+        long start = System.currentTimeMillis();
         try {
             String content = request.getContent() == null ? "" : request.getContent().trim();
-            ChatSession session = resolveSession(userId, request.getSessionId());
+            SessionResolution resolution = resolveSession(userId, request.getSessionId());
+            ChatSession session = resolution.session();
             sessionId = session.getId();
+            // 轮次标记进 MDC：本轮所有日志（含 rag/kb/llm 各层）都带同一个标记，便于顺链排查
+            MDC.put(TURN_KEY, turnTag(session));
+            log.info("会话{}：askRound={} hasResult={} status={}", resolution.created() ? "新建" : "续聊",
+                    session.getAskRound(), session.getHasResult(), session.getStatus());
             handleTurn(userId, session, content, emitter);
         } catch (BizException e) {
             log.warn("导诊流业务异常：{}", e.getMessage());
@@ -136,14 +146,18 @@ public class ChatService {
         } catch (Exception e) {
             log.error("导诊流异常", e);
             emitError(emitter, sessionId, "系统繁忙，请稍后重试；您也可以重新描述一次症状。");
+        } finally {
+            log.info("本轮结束：总耗时 {} ms", System.currentTimeMillis() - start);
+            MDC.remove(TURN_KEY);
+            safeComplete(emitter);
         }
-        safeComplete(emitter);
     }
 
     /** 单轮编排主体：会话落定后执行（sessionId 已确定，异常由外层统一转 SSE error） */
     private void handleTurn(String userId, ChatSession session, String content, SseEmitter emitter) {
         {
             String sessionId = session.getId();
+            log.info("患者输入：{}", abbreviate(content, 120));
             send(emitter, SseEvents.SESSION, new SseEvents.SessionEvent(sessionId));
 
             saveMessage(sessionId, MessageRole.USER, content);
@@ -151,15 +165,19 @@ public class ChatService {
             // ① 敏感词入口前置校验（先于信息充足性判定）
             SensitiveGuard.GuardResult guard = sensitiveGuard.check(userId, sessionId, content);
             if (guard.action() == SensitiveGuard.GuardResult.Action.BLOCKED) {
+                log.info("入口校验：命中禁止词「{}」，拦截并返回固定引导（未调模型）", guard.word());
                 saveMessage(sessionId, MessageRole.AI, guard.reply());
                 emitText(emitter, sessionId, guard.reply());
                 send(emitter, SseEvents.DONE, new SseEvents.DoneEvent(sessionId, false));
                 return;
             }
+            log.info("入口校验：{}", guard.action() == SensitiveGuard.GuardResult.Action.WATCHED
+                    ? "命中观察词「" + guard.word() + "」，放行并留痕" : "通过（无禁止词命中）");
 
             // ② 规则硬门槛：首条主诉过于笼统 → 模板追问，不调模型
             if (isFirstTurn(session) && sufficiencyRule.tooVague(content)) {
                 String question = sufficiencyRule.templateQuestion();
+                log.info("规则门槛：首条主诉过于笼统（未命中术语且过短），模板追问（未调模型/未检索）");
                 saveMessage(sessionId, MessageRole.QUESTION, question);
                 ask(emitter, session, question);
                 return;
@@ -169,6 +187,8 @@ public class ChatService {
             int askMaxRounds = sysConfigService.getInt(SysConfigService.KEY_ASK_MAX_ROUNDS, 3);
             int askRound = session.getAskRound() == null ? 0 : session.getAskRound();
             boolean forceConclusion = askRound >= askMaxRounds;
+            log.info("进入检索：追问轮次 {}/{}｜强制结论={}｜候选科室 {} 个", askRound, askMaxRounds,
+                    forceConclusion, deptOptions().size());
             RagRequest ragRequest = new RagRequest(content, loadHistory(sessionId), deptOptions(),
                     askRound, forceConclusion,
                     sysConfigService.getInt(SysConfigService.KEY_RETRIEVE_TOP_K, RagRequest.DEFAULT_TOP_K),
@@ -177,23 +197,38 @@ public class ChatService {
 
             // ④ 流式生成：闸门分流——自然语言进气泡，结论 JSON 截留待解析
             StreamGate gate = new StreamGate(AnswerParser.MARKER);
+            long[] generation = new long[3];  // [0] 首字时间戳 [1] 分片数 [2] 可见文本字数
+            long start = System.currentTimeMillis();
+            generation[0] = 0;
             String rawOutput = ragService.streamAnswer(ragRequest, context, delta -> {
+                if (generation[0] == 0) {
+                    generation[0] = System.currentTimeMillis();
+                }
+                generation[1]++;
                 String visible = gate.accept(delta);
                 if (!visible.isEmpty()) {
+                    generation[2] += visible.length();
                     emitText(emitter, sessionId, visible);
                 }
             });
             String tail = gate.flush();
             if (!tail.isEmpty()) {
+                generation[2] += tail.length();
                 emitText(emitter, sessionId, tail);
             }
+            long generationMs = System.currentTimeMillis() - start;
+            long firstTokenMs = generation[0] == 0 ? generationMs : generation[0] - start;
+            log.info("模型生成：首字 {} ms｜总耗时 {} ms｜输出 {} 字（可见 {} 字）｜分片 {} 个",
+                    firstTokenMs, generationMs, rawOutput.length(), generation[2], generation[1]);
+            log.debug("模型原始输出：{}", abbreviate(rawOutput, 800));
 
             // ⑤ 解析与分流
             RagAnswer answer = answerParser.parse(rawOutput);
             if (answer.verdict() == RagAnswer.Verdict.RECOMMEND && !rawOutput.contains(AnswerParser.MARKER)) {
                 // 模型漏输出结论分隔符：JSON 已随 delta 流进气泡，这里只留痕，便于后续调 Prompt
-                log.warn("模型未输出结论分隔符，按 JSON 兜底解析：sessionId={}", sessionId);
+                log.warn("模型未输出结论分隔符，按 JSON 兜底解析（结论 JSON 已随 delta 进入气泡）");
             }
+            logAnswer(answer, forceConclusion);
             if (answer.verdict() == RagAnswer.Verdict.ASK && !forceConclusion) {
                 saveMessage(sessionId, MessageRole.QUESTION, answer.reply());
                 ask(emitter, session, answer.reply());
@@ -208,6 +243,22 @@ public class ChatService {
         }
     }
 
+    /** 解析结果留痕：判定分支、模型自报置信度（含是否通过校验）、Top3、引用注号 */
+    private void logAnswer(RagAnswer answer, boolean forceConclusion) {
+        if (answer.verdict() == RagAnswer.Verdict.ASK) {
+            log.info("结论解析：判定=追问（信息不足{}）｜追问内容 {} 字",
+                    forceConclusion ? "，但已到追问上限，将强制出低置信度结论" : "", answer.reply().length());
+            return;
+        }
+        StringBuilder top3 = new StringBuilder();
+        for (RagAnswer.DeptCandidate candidate : answer.top3()) {
+            top3.append(candidate.dept()).append('=').append(candidate.confidence()).append(' ');
+        }
+        log.info("结论解析：判定=出结论｜模型自报置信度={}（校验{}）｜Top3 [{}]｜引用注号 {}｜说明 {}",
+                answer.confidence(), answer.confidenceValid() ? "通过" : "未通过→置空走低置信度分流",
+                top3.toString().trim(), answer.cites(), abbreviate(answer.note(), 80));
+    }
+
     /**
      * 追问分支：轮次 +1 + question/done 事件（消息落库由调用方负责）。
      * 注意追问文本在 ASK 轮已随 delta 流过——question 事件是「这条气泡属追问」的权威标记，
@@ -215,6 +266,7 @@ public class ChatService {
      */
     private void ask(SseEmitter emitter, ChatSession session, String question) {
         int nextRound = (session.getAskRound() == null ? 0 : session.getAskRound()) + 1;
+        log.info("追问发出：轮次 {} → {}｜内容：{}", session.getAskRound(), nextRound, abbreviate(question, 120));
         session.setAskRound(nextRound);
         sessionMapper.updateById(session);
         send(emitter, SseEvents.QUESTION, new SseEvents.QuestionEvent(session.getId(), question, nextRound));
@@ -225,11 +277,11 @@ public class ChatService {
      * 会话状态机（新主诉判定双信号）：请求带的会话可续聊（ongoing 且未出结论）则续聊，
      * 否则开新会话——判定是状态机字段，不做模型语义判断。
      */
-    private ChatSession resolveSession(String userId, String sessionId) {
+    private SessionResolution resolveSession(String userId, String sessionId) {
         if (StringUtils.hasText(sessionId)) {
             ChatSession existing = sessionMapper.selectById(sessionId);
             if (existing != null && userId.equals(existing.getUserId()) && existing.continuable()) {
-                return existing;
+                return new SessionResolution(existing, false);
             }
         }
         ChatSession created = new ChatSession();
@@ -238,7 +290,30 @@ public class ChatService {
         created.setAskRound(0);
         created.setHasResult(0);
         sessionMapper.insert(created);
-        return created;
+        return new SessionResolution(created, true);
+    }
+
+    /**
+     * 轮次标记（MDC）：会话后 6 位 + 本轮序号，例如 s666690-r2。
+     * 一轮导诊跨 chat/rag/kb/llm 多层，日志按它归组才看得清顺序。
+     */
+    private String turnTag(ChatSession session) {
+        String id = session.getId();
+        String shortId = id.length() > 6 ? id.substring(id.length() - 6) : id;
+        int round = (session.getAskRound() == null ? 0 : session.getAskRound()) + 1;
+        return "s" + shortId + "-r" + round;
+    }
+
+    private String abbreviate(String text, int max) {
+        if (text == null) {
+            return "";
+        }
+        String flat = text.replaceAll("\s+", " ");
+        return flat.length() > max ? flat.substring(0, max) + "…" : flat;
+    }
+
+    /** 会话解析结果：created=true 表示本轮开了新会话 */
+    private record SessionResolution(ChatSession session, boolean created) {
     }
 
     /**
@@ -311,9 +386,11 @@ public class ChatService {
 
     private void send(SseEmitter emitter, String event, Object payload) {
         try {
+            String json = objectMapper.writeValueAsString(payload);
+            log.debug("SSE 事件：{}｜{} 字", event, json.length());
             emitter.send(SseEmitter.event()
                     .name(event)
-                    .data(objectMapper.writeValueAsString(payload), MediaType.APPLICATION_JSON));
+                    .data(json, MediaType.APPLICATION_JSON));
         } catch (IOException e) {
             // 客户端断开：终止本轮流，不再继续生成与落库
             throw new BizException(ErrorCode.INTERNAL_ERROR, "连接已断开");

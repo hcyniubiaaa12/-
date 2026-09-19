@@ -71,6 +71,10 @@ public class GuideService {
                 log.info("推荐校验：科室「{}」不可用已过滤（停用或不存在）", candidate.dept());
             }
         }
+        if (kept.size() < answer.top3().size()) {
+            log.info("推荐校验：模型 Top3 {} 条 → 校验后保留 {} 条（其余为停用/不存在科室）",
+                    answer.top3().size(), kept.size());
+        }
         boolean fallback = false;
         if (kept.isEmpty()) {
             // 全被拦：取检索片段的所属科室兜底，走低置信度分流（进盲区榜）
@@ -100,6 +104,12 @@ public class GuideService {
         session.setHasResult(1);
         sessionMapper.updateById(session);
 
+        log.info("结论落库：recordId={} 科室={} 置信度={} 低置信度={}（阈值 {}）Top3={} 条 证据片段={} 条",
+                record.getId(), kept.get(0).dept().getName(), confidence, lowConfidence, threshold,
+                kept.size(), context.chunks().size());
+        if (lowConfidence) {
+            log.info("低置信度分流：该记录进盲区榜，不参与准确率统计");
+        }
         return new Conclusion(record, resultPayload(session.getId(), record, kept, answer, context, lowConfidence));
     }
 
@@ -132,6 +142,8 @@ public class GuideService {
         record.setTop1Hit(dept.getId().equals(record.getRecDeptId()) ? 1 : 0);
         record.setTop3Hit(top3Contains(record.getRecTop3(), dept.getId()) ? 1 : 0);
         guideRecordMapper.updateById(record);
+        log.info("挂号确认：recordId={} 实际科室={}｜命中 top1={} top3={}（top1 未中 top3 中=排序精度问题，不进回流）",
+                record.getId(), dept.getName(), record.getTop1Hit(), record.getTop3Hit());
 
         session.setStatus(SessionStatus.CLOSED);
         sessionMapper.updateById(session);

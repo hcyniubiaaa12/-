@@ -5,6 +5,7 @@ import com.guide.auth.entity.SensitiveWord;
 import com.guide.auth.enums.SensitiveWordType;
 import com.guide.auth.mapper.SensitiveWordMapper;
 import com.guide.chat.event.SensitiveHitEvent;
+import com.guide.common.config.PromptProperties;
 import com.guide.kb.service.MedicalTermService;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -29,12 +30,10 @@ import java.util.List;
 @RequiredArgsConstructor
 public class SensitiveGuard {
 
-    /** 拦截话术：固定引导，不道歉不模糊；急症兜底提示 */
-    private static final String BLOCKED_REPLY = "请描述您的症状，我来帮您分诊。若情况紧急，请直接前往急诊。";
-
     private final SensitiveWordMapper sensitiveWordMapper;
     private final MedicalTermService medicalTermService;
     private final ApplicationEventPublisher eventPublisher;
+    private final PromptProperties prompts;
 
     public GuardResult check(String userId, String sessionId, String content) {
         if (content == null || content.isBlank()) {
@@ -43,8 +42,12 @@ public class SensitiveGuard {
         List<SensitiveWord> words = sensitiveWordMapper.selectList(Wrappers.<SensitiveWord>lambdaQuery()
                 .eq(SensitiveWord::getEnabled, 1));
         if (words.isEmpty()) {
+            log.debug("入口校验：词库无启用词，直接放行");
             return GuardResult.pass();
         }
+        log.debug("入口校验：加载启用词 {} 条（禁止 {} / 观察 {}）", words.size(),
+                words.stream().filter(w -> w.getType() == SensitiveWordType.BANNED).count(),
+                words.stream().filter(w -> w.getType() == SensitiveWordType.WATCH).count());
         GuardResult watched = null;
         for (SensitiveWord word : words) {
             if (word.getWord() == null || !content.contains(word.getWord())) {
@@ -63,7 +66,8 @@ public class SensitiveGuard {
                 continue;
             }
             recordHit(userId, sessionId, word, SensitiveHitEvent.BLOCKED);
-            return GuardResult.blocked(word.getWord(), BLOCKED_REPLY);
+            // 拦截话术来自 prompts.yml 的 prompts.chat.blocked-reply
+            return GuardResult.blocked(word.getWord(), prompts.getChat().getBlockedReply());
         }
         return watched != null ? watched : GuardResult.pass();
     }
