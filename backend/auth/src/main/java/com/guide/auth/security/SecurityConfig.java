@@ -3,6 +3,7 @@ package com.guide.auth.security;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.guide.common.api.ErrorCode;
 import com.guide.common.api.Result;
+import jakarta.servlet.DispatcherType;
 import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
@@ -41,7 +42,12 @@ public class SecurityConfig {
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
+                        // SSE 异步派发（AsyncContext 完成）会重跑过滤器链，此时安全上下文已随
+                        // 原请求线程清理——授权已在首次派发完成，这里必须放行，否则 Async 派发抛
+                        // AccessDeniedException（响应已提交，只能污染日志）；ERROR 派发同理
+                        .dispatcherTypeMatchers(DispatcherType.ASYNC, DispatcherType.ERROR).permitAll()
                         .requestMatchers("/api/auth/login", "/api/auth/register").permitAll()
+                        .requestMatchers("/error").permitAll()
                         .requestMatchers("/api/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated())
                 .exceptionHandling(handler -> handler
